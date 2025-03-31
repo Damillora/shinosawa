@@ -17,4 +17,5 @@ target/
 #.idea/
 
 # Rootfs
-target/rootfsovmf/OVMF_VARS.4m.fd
+target/rootfs
+ovmf/OVMF_VARS.4m.fd
