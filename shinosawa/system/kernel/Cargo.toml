@@ -11,4 +11,6 @@ test = false
 bench = false
 
 [dependencies]
+embedded-graphics = "0.8.1"
 limine = "0.4.0"
+profont = "0.7.0"
