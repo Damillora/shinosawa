@@ -1,0 +1,8 @@
+# shinosawa
+an operating system for those who find joy in things that don't go well, written by someone least cut out for it.
+
+## Contributing
+shinosawa is still incomplete, and not yet open to contributions.
+
+## License
+shinosawa is licensed under the [MIT license](https://choosealicense.com/licenses/mit/).
