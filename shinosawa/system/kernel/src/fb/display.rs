@@ -2,6 +2,7 @@ use core::slice;
 
 use embedded_graphics::{pixelcolor::Rgb888, prelude::*};
 use limine::framebuffer::Framebuffer;
+use spin::Mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
@@ -18,7 +19,7 @@ pub struct Color {
 }
 
 pub struct SnFramebufferDisplay {
-    buffer: &'static mut [u8],
+    buffer: Mutex<&'static mut [u8]> ,
     bpp: u16,
     pitch: usize,
     pub width: usize,
@@ -31,7 +32,7 @@ impl SnFramebufferDisplay {
         let buffer_slice = unsafe { slice::from_raw_parts_mut(framebuffer.addr(), fb_size) };
 
         SnFramebufferDisplay {
-            buffer: buffer_slice,
+            buffer: Mutex::new(buffer_slice),
             pitch: framebuffer.pitch() as usize,
             bpp: framebuffer.bpp(),
             height: framebuffer.height() as usize,
@@ -42,7 +43,7 @@ impl SnFramebufferDisplay {
     fn set_pixel_in(&mut self, position: Position, color: Color) {
         let pixel_offset = position.y * self.pitch as usize + position.x * (self.bpp / 8) as usize;
 
-        let pixel_buffer = &mut self.buffer[pixel_offset..];
+        let pixel_buffer = &mut self.buffer.lock()[pixel_offset..];
 
         pixel_buffer[3] = color.alpha;
         pixel_buffer[2] = color.red;
