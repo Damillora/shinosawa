@@ -12,7 +12,6 @@
 mod fb;
 /// Limine intrinsics
 mod limine;
-
 /// Logger module
 mod logger;
 /// Panic handler
@@ -23,6 +22,8 @@ mod serial;
 mod tests;
 /// Abstraction over architecture specific stuff
 mod hal;
+/// Memory management
+mod memory;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -39,6 +40,7 @@ pub fn kernel_main() {
     }
 
     hal::interface::cpu::init();
+    hal::interface::paging::init();
 
     #[cfg(test)]
     {
