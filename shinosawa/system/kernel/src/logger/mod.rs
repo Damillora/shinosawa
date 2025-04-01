@@ -1,7 +1,7 @@
 use core::fmt;
 
 use conquer_once::spin::OnceCell;
-use spinning_top::Spinlock;
+use spin::Mutex;
 
 use crate::{
     fb::{display::SnFramebufferDisplay, writer::SnFramebufferWriter},
@@ -13,15 +13,15 @@ pub static LOGGER: OnceCell<SnLogger> = OnceCell::uninit();
 
 /// A logger instance protected by a spinlock.
 pub struct SnLogger {
-    pub writer: Option<Spinlock<SnFramebufferWriter>>,
-    pub serial: Option<Spinlock<SnSerialWriter>>,
+    pub writer: Option<Mutex<SnFramebufferWriter>>,
+    pub serial: Option<Mutex<SnSerialWriter>>,
 }
 
 impl SnLogger {
     pub fn new(writer: SnFramebufferWriter, serial: SnSerialWriter) -> SnLogger {
         SnLogger {
-            writer: Some(Spinlock::new(writer)),
-            serial: Some(Spinlock::new(serial)),
+            writer: Some(Mutex::new(writer)),
+            serial: Some(Mutex::new(serial)),
         }
     }
 }
