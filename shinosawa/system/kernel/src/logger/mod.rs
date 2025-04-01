@@ -5,7 +5,7 @@ use spinning_top::Spinlock;
 
 use crate::{
     fb::{display::SnFramebufferDisplay, writer::SnFramebufferWriter},
-    serial::{self, SnSerialWriter},
+    serial::SnSerialWriter,
 };
 
 /// The global logger instance used for the `log` crate.

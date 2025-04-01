@@ -2,5 +2,5 @@
 set -e
 CARGO_WORKSPACE_DIR=$(dirname "$(cargo locate-project --workspace --message-format=plain)")
 
-cargo -Z unstable-options -C $CARGO_WORKSPACE_DIR/tools/koukei run -- build-image
+$CARGO_WORKSPACE_DIR/tools/build_image.sh "$1"
 $CARGO_WORKSPACE_DIR/tools/emulate.sh
