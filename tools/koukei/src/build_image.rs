@@ -4,9 +4,10 @@ use std::{
 
 use fatfs::Dir;
 
+pub const IMAGE_FILE: &str = "target/shinosawa.img";
+
 const TARGET: &str = "x86_64-shinosawa";
 const EFI_ROOT: &str = "efi_root";
-const IMAGE_FILE: &str = "target/shinosawa.img";
 const FAT_FILE: &str = "target/shinosawa-rootfs.img";
 
 const PART_SIZE: u64 = 100 * 1024 * 1024; // 100 MB
@@ -44,7 +45,7 @@ fn copy_shinosawa_system_files(root_dir: Dir<'_, &File>, entries: HashMap<String
     }
 }
 
-fn create_fat_image(profile: String, kernel_path: String) {
+fn create_fat_image(kernel_path: String) {
     // create new filesystem image file at the given path and set its length
     let fat_file = fs::OpenOptions::new()
         .read(true)
@@ -130,7 +131,7 @@ pub fn command(profile: String, kernel_image: Option<String>) {
     };
     println!("using kernel {}", kernel_path);
 
-    create_fat_image(profile, kernel_path);
+    create_fat_image(kernel_path);
     create_gpt_image();
 
     // Cleanup

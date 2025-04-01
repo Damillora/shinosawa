@@ -4,6 +4,7 @@ use std::{env, path::Path};
 use clap::{Parser, Subcommand};
 
 mod build_image;
+mod emulate;
 
 /// Builder helpers for shinosawa
 #[derive(Parser)]
@@ -32,6 +33,11 @@ enum Commands {
         #[clap(long, short)]
         kernel_image: Option<String>,
     },
+    /// Start a virtual machine for debugging
+    Emulate {
+        #[clap(default_value_t = String::from(build_image::IMAGE_FILE))]
+        image: String
+    }
 }
 
 fn main() {
@@ -46,5 +52,6 @@ fn main() {
         Commands::BuildImage { profile, kernel_image} => {
             build_image::command(profile.to_owned(), kernel_image.to_owned());
         }
+        Commands::Emulate { image} => emulate::command(image.to_string())
     }
 }

@@ -7,4 +7,4 @@ if [[ -n "$1" ]] then
 else
     cargo -Z unstable-options -C $CARGO_WORKSPACE_DIR/tools/koukei run -- -C $CARGO_WORKSPACE_DIR build-image
 fi
-$CARGO_WORKSPACE_DIR/tools/emulate.sh
+cargo -Z unstable-options -C $CARGO_WORKSPACE_DIR/tools/koukei run -- -C $CARGO_WORKSPACE_DIR emulate
