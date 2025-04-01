@@ -38,7 +38,7 @@ pub fn kernel_main() {
         printk!("written by someone least cut out for it.");
     }
 
-    hal::interface::interrupt::init();
+    hal::interface::cpu::init();
 
     #[cfg(test)]
     {
