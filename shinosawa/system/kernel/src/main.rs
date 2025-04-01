@@ -1,8 +1,12 @@
+// say no to std and main
 #![no_std]
 #![no_main]
+// custom test runner
 #![feature(custom_test_frameworks)]
 #![test_runner(tests::test_runner)]
 #![reexport_test_harness_main = "kernel_test_main"]
+
+#![feature(abi_x86_interrupt)]
 
 /// Framebuffer module
 mod fb;
@@ -33,6 +37,8 @@ pub fn kernel_main() {
         printk!("an operating system for those who find joy in things that don't go well,");
         printk!("written by someone least cut out for it.");
     }
+
+    hal::interface::interrupt::init();
 
     #[cfg(test)]
     {
