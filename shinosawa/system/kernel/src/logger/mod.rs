@@ -56,6 +56,12 @@ macro_rules! printk {
     ($($arg:tt)*) => ($crate::println!("shinosawa::system::kernel: {}", format_args!($($arg)*)));
 }
 
+#[macro_export]
+macro_rules! printk_sub {
+    () => ($crate::print!("\n"));
+    ($subsystem:tt, $($arg:tt)*) => ($crate::println!("shinosawa::system::kernel: {}: {}", $subsystem, format_args!($($arg)*)));
+}
+
 pub fn init(display: SnFramebufferDisplay, serial: SnSerialWriter) {
     let mut writer = SnFramebufferWriter::new(display);
     writer.clear();
