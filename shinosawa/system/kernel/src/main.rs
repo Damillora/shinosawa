@@ -20,7 +20,8 @@ mod panic;
 mod serial;
 /// Tests
 mod tests;
-const VERSION: &str = "0.1.0";
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn kernel_main() {
     let display = fb::init().unwrap();
