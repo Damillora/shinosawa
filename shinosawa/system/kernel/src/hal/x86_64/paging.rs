@@ -9,11 +9,9 @@ use x86_64::{
 
 use crate::{
     limine::MEMORY_MAP_REQUEST,
-    memory::{alloc::{HEAP_SIZE, HEAP_START}, SnAddr, SnVirtAddr},
+    memory::alloc::{HEAP_SIZE, HEAP_START},
     printk,
 };
-
-use lazy_static::lazy_static;
 
 /// Returns a mutable reference to the active level 4 table.
 ///
@@ -38,20 +36,18 @@ use linked_list_allocator::LockedHeap;
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
-lazy_static! {
-    pub static ref PHYSICAL_MEM_OFFSET: SnVirtAddr = {
-        if let Some(res) = crate::limine::HHDM_REQUEST.get_response() {
-            return SnVirtAddr::new(res.offset());
-        } else {
-            panic!("cannot get HHDM");
-        }
-    };
+pub struct MemoryInfo {
+    pub physical_memory_offset: VirtAddr,
+
+    /// Allocate empty frames
+    pub frame_allocator: SnLimineFrameAllocator,
+    kernel_l4_table: &'static mut PageTable,
+
 }
 
-unsafe fn init_page_table() -> OffsetPageTable<'static> {
-    printk!("x86_64: initializing page table translation");
-    let physical_memory_offset = VirtAddr::new(PHYSICAL_MEM_OFFSET.as_u64());
+pub static mut MEMORY_INFO: Option<MemoryInfo> = None;
 
+pub unsafe fn init_page_table(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     unsafe {
         let level_4_table = active_level_4_table(physical_memory_offset);
         OffsetPageTable::new(level_4_table, physical_memory_offset)
@@ -59,15 +55,34 @@ unsafe fn init_page_table() -> OffsetPageTable<'static> {
 }
 
 pub fn init() {
-    if let Some(resp) = MEMORY_MAP_REQUEST.get_response() {
-        let mut frame_allocator = unsafe { SnLimineFrameAllocator::init(resp.entries()) };
+    if let Some(res) = crate::limine::HHDM_REQUEST.get_response() {
+        let physical_memory_offset = VirtAddr::new(res.offset());// Store boot_info for later calls
+        
+        if let Some(resp) = MEMORY_MAP_REQUEST.get_response() {
+            let frame_allocator = unsafe { SnLimineFrameAllocator::init(resp.entries()) };
 
-        let mut page_table: OffsetPageTable<'_> = unsafe { init_page_table() };
+            let mut page_table: OffsetPageTable<'_> = unsafe { init_page_table(physical_memory_offset) };
 
-        printk!("x86_64: initializing kernel heap");
-        init_heap(&mut page_table, &mut frame_allocator)
-            .expect("heap initialization failed");
+            unsafe { MEMORY_INFO = Some(MemoryInfo {
+                physical_memory_offset,
+                frame_allocator,
+                kernel_l4_table: active_level_4_table(physical_memory_offset),
+            }) };
+
+            // FIXME: Static mutable here, must there be something better
+            #[allow(static_mut_refs)]
+            let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+            
+            printk!("x86_64: initializing kernel heap");
+            init_heap(&mut page_table, &mut memory_info.frame_allocator)
+                .expect("heap initialization failed");
+
+        }
+        
+    } else {
+        panic!("cannot get HHDM");
     }
+
 }
 
 /// Create heap
