@@ -4,6 +4,8 @@ use x86_64::structures::tss::TaskStateSegment;
 use lazy_static::lazy_static;
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor};
 
+use crate::printk;
+
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
 lazy_static! {
@@ -36,6 +38,7 @@ struct Selectors {
 }
 
 pub fn init() {
+    printk!("x86_64: initializing GDT");
     use x86_64::instructions::tables::load_tss;
     use x86_64::instructions::segmentation::{CS,SS, Segment};
     
