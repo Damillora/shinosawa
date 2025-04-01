@@ -20,11 +20,10 @@ pub struct SnFramebufferWriter {
 
 impl SnFramebufferWriter {
     pub fn new(display: SnFramebufferDisplay) -> SnFramebufferWriter {
-        // let display = DISPLAY
         let logger = Self {
             display: display,
             x_pos: BORDER_PADDING,
-            y_pos: PROFONT_18_POINT.character_size.height as usize + BORDER_PADDING,
+            y_pos: 18 + BORDER_PADDING,
             x_char: PROFONT_18_POINT.character_size.width as usize,
             y_char: PROFONT_18_POINT.character_size.height as usize,
         };
@@ -34,10 +33,6 @@ impl SnFramebufferWriter {
 
     fn newline(&mut self) {
         self.y_pos += self.x_char + LINE_SPACING;
-        if self.y_pos >= self.height() {
-            self.clear();
-            self.y_pos = BORDER_PADDING + self.y_char;
-        }
         self.carriage_return();
     }
 
@@ -63,7 +58,7 @@ impl SnFramebufferWriter {
                     MonoTextStyle::new(&PROFONT_18_POINT, Rgb888::new(0xFF, 0xFF, 0xFF));
                 let str = &mut [0u8; 4];
                 let new_str = c.encode_utf8(str);
-                Text::new(new_str, Point::new(self.x_pos as i32, self.y_pos as i32), character_style)
+                let next_pos = Text::new(new_str, Point::new(self.x_pos as i32, self.y_pos as i32), character_style)
                     .draw(&mut self.display)
                     .unwrap();
                 self.x_pos += self.x_char;
