@@ -1,5 +1,7 @@
 use core::fmt::{self, Debug};
 
+use ::alloc::{boxed::Box,  vec, rc::Rc, vec::Vec};
+
 use crate::{hal, printk};
 
 pub mod alloc;
@@ -45,18 +47,24 @@ impl Debug for SnPhysAddr {
     }
 }
 
-
 #[test_case]
-fn memory_map() {
+fn test_memory_alloc() {
+    
+    // allocate a number on the heap
+    let heap_value = Box::new(41);
+    printk!("heap_value at {:p}", heap_value);
 
-    let addresses = [
-        hal::interface::paging::PHYSICAL_MEM_OFFSET.as_u64(),
-    ];
-
-    for &address in &addresses {
-        let virt = SnVirtAddr::new(address);
-        let virt_addr = virt.as_u64();
-        let phys = unsafe { crate::hal::interface::paging::translate_addr(virt) };
-        printk!("translate: {:?} -> {:?}", virt_addr, phys);
+    // create a dynamically sized vector
+    let mut vec = Vec::new();
+    for i in 0..500 {
+        vec.push(i);
     }
+    printk!("vec at {:p}", vec.as_slice());
+
+    // create a reference counted vector -> will be freed when count reaches 0
+    let reference_counted = Rc::new(vec![1, 2, 3]);
+    let cloned_reference = reference_counted.clone();
+    printk!("current reference count is {}", Rc::strong_count(&cloned_reference));
+    core::mem::drop(reference_counted);
+    printk!("reference count is {} now", Rc::strong_count(&cloned_reference));
 }

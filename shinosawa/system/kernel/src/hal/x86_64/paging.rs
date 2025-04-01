@@ -2,15 +2,14 @@
 
 use limine::memory_map::{self, EntryType};
 use x86_64::{
-    PhysAddr, VirtAddr,
     structures::paging::{
-        FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB, Translate,
-    },
+        mapper::MapToError, FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame, Size4KiB
+    }, PhysAddr, VirtAddr
 };
 
 use crate::{
     limine::MEMORY_MAP_REQUEST,
-    memory::{SnAddr, SnPhysAddr, SnVirtAddr},
+    memory::{alloc::{HEAP_SIZE, HEAP_START}, SnAddr, SnVirtAddr},
     printk,
 };
 
@@ -34,6 +33,11 @@ pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static
     unsafe { &mut *page_table_ptr }
 }
 
+use linked_list_allocator::LockedHeap;
+
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty();
+
 lazy_static! {
     pub static ref PHYSICAL_MEM_OFFSET: SnVirtAddr = {
         if let Some(res) = crate::limine::HHDM_REQUEST.get_response() {
@@ -55,56 +59,45 @@ unsafe fn init_page_table() -> OffsetPageTable<'static> {
 }
 
 pub fn init() {
-    printk!("x86_64: checking mapping");
     if let Some(resp) = MEMORY_MAP_REQUEST.get_response() {
         let mut frame_allocator = unsafe { SnLimineFrameAllocator::init(resp.entries()) };
 
         let mut page_table: OffsetPageTable<'_> = unsafe { init_page_table() };
 
-        // map an unused page
-        let page = Page::containing_address(VirtAddr::new(0));
-        create_example_mapping(page, &mut page_table, &mut frame_allocator);
-
-        // write the string `New!` to the screen through the new mapping
-        let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
-        unsafe { page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e) };
+        printk!("x86_64: initializing kernel heap");
+        init_heap(&mut page_table, &mut frame_allocator)
+            .expect("heap initialization failed");
     }
 }
 
-/// Translates the given virtual address to the mapped physical address, or
-/// `None` if the address is not mapped.
-///
-/// This function is unsafe because the caller must guarantee that the
-/// complete physical memory is mapped to virtual memory at the passed
-/// `physical_memory_offset`.
-pub unsafe fn translate_addr(addr: SnVirtAddr) -> Option<SnPhysAddr> {
-    let page_table = unsafe { init_page_table() };
-
-    let virt = VirtAddr::new(addr.as_u64());
-    let translated = page_table.translate_addr(virt);
-
-    match translated {
-        Some(translated) => Some(SnPhysAddr::new(translated.as_u64())),
-        None => None,
-    }
-}
-
-/// Creates an example mapping for the given page to frame `0xb8000`.
-fn create_example_mapping(
-    page: Page,
-    mapper: &mut OffsetPageTable,
+/// Create heap
+pub fn init_heap(
+    mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
-) {
-    use x86_64::structures::paging::PageTableFlags as Flags;
-
-    let frame = PhysFrame::containing_address(PhysAddr::new(0xb8000));
-    let flags = Flags::PRESENT | Flags::WRITABLE;
-
-    let map_to_result = unsafe {
-        // FIXME: this is not safe, we do it only for testing
-        mapper.map_to(page, frame, flags, frame_allocator)
+) -> Result<(), MapToError<Size4KiB>> {
+    let page_range = {
+        let heap_start = VirtAddr::new(HEAP_START as u64);
+        let heap_end = heap_start + HEAP_SIZE as u64 - 1u64;
+        let heap_start_page = Page::containing_address(heap_start);
+        let heap_end_page = Page::containing_address(heap_end);
+        Page::range_inclusive(heap_start_page, heap_end_page)
     };
-    map_to_result.expect("map_to failed").flush();
+
+    for page in page_range {
+        let frame = frame_allocator
+            .allocate_frame()
+            .ok_or(MapToError::FrameAllocationFailed)?;
+        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+        unsafe {
+            mapper.map_to(page, frame, flags, frame_allocator)?.flush()
+        };
+    }
+
+    unsafe {
+        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
+    }
+
+    Ok(())
 }
 
 pub struct SnLimineFrameAllocator {

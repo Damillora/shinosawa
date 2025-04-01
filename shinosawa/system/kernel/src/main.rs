@@ -8,6 +8,8 @@
 
 #![feature(abi_x86_interrupt)]
 
+use alloc::boxed::Box;
+
 extern crate alloc;
 
 /// Framebuffer module
