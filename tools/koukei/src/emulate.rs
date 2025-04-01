@@ -24,7 +24,7 @@ pub fn command(image: String) {
             "-drive",
             "if=pflash,unit=0,format=raw,file=ovmf/OVMF_CODE.4m.fd,readonly=on",
             "-drive",
-            "if=pflash,unit=1,format=raw,file=ovmf/OVMF_VARS.4m.fd",
+            "if=pflash,unit=1,format=raw,file=ovmf/OVMF_VARS.4m.fd,readonly=on",
             "-hda",
             &image,
             "-m",
