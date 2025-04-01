@@ -8,6 +8,8 @@
 
 #![feature(abi_x86_interrupt)]
 
+extern crate alloc;
+
 /// Framebuffer module
 mod fb;
 /// Limine intrinsics
