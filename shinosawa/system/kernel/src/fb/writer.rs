@@ -1,9 +1,10 @@
 use core::fmt;
 
 use embedded_graphics::{
-    mono_font::MonoTextStyle, pixelcolor::Rgb888, prelude::Point, text::Text, Drawable, Pixel
+    mono_font::{MonoFont, MonoTextStyle}, pixelcolor::Rgb888, prelude::Point, text::Text, Drawable, Pixel
 };
-use profont::PROFONT_18_POINT;
+
+const FONT: MonoFont<'_> = embedded_graphics::mono_font::ascii::FONT_9X18;
 
 use super::display::SnFramebufferDisplay;
 
@@ -23,9 +24,9 @@ impl SnFramebufferWriter {
         let logger = Self {
             display: display,
             x_pos: BORDER_PADDING,
-            y_pos: PROFONT_18_POINT.character_size.height as usize,
-            x_char: PROFONT_18_POINT.character_size.width as usize + PROFONT_18_POINT.character_spacing as usize,
-            y_char: PROFONT_18_POINT.character_size.height as usize,
+            y_pos: FONT.character_size.height as usize,
+            x_char: FONT.character_size.width as usize + FONT.character_spacing as usize,
+            y_char: FONT.character_size.height as usize,
         };
 
         logger
@@ -34,7 +35,7 @@ impl SnFramebufferWriter {
     fn newline(&mut self) {
         self.y_pos += self.x_char + LINE_SPACING;
         if self.y_pos >= self.height() {
-            self.y_pos = PROFONT_18_POINT.character_size.height as usize + BORDER_PADDING;
+            self.y_pos = FONT.character_size.height as usize;
             self.clear();
         }
         self.carriage_return();
@@ -59,7 +60,7 @@ impl SnFramebufferWriter {
             '\r' => self.carriage_return(),
             c => {
                 let character_style =
-                    MonoTextStyle::new(&PROFONT_18_POINT, Rgb888::new(0xFF, 0xFF, 0xFF));
+                    MonoTextStyle::new(&FONT, Rgb888::new(0xFF, 0xFF, 0xFF));
                 let str = &mut [0u8; 4];
                 let new_str = c.encode_utf8(str);
                 Text::new(new_str, Point::new(self.x_pos as i32, self.y_pos as i32), character_style)
