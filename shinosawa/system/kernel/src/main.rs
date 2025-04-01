@@ -34,6 +34,7 @@ pub fn kernel_main() {
 
     #[cfg(test)]
     {
+        printk!("tests has been enabled. running them now.");
         use panic::hcf;
         kernel_test_main();
 
