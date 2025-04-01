@@ -30,7 +30,7 @@ unsafe extern "C" fn kmain() -> ! {
 
     kernel_main();
     
-    hcf();
+    panic!("kmain somehow exited");
 }
 
 fn hcf() -> ! {
