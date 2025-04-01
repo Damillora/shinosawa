@@ -42,7 +42,7 @@ extern "x86-interrupt" fn page_fault_handler(
 ) {
     use x86_64::registers::control::Cr2;
 
-    printk!("x86_64: PAGE FAULT");
+    printk!("x86_64: page fault");
     printk!("you tried to access address: {:?}", Cr2::read());
     printk!("error code: {:?}", error_code);
     printk!("{:#?}", stack_frame);
