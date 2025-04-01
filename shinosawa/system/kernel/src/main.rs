@@ -17,6 +17,8 @@ mod panic;
 mod serial;
 /// Tests
 mod tests;
+/// Abstraction over architecture specific stuff
+mod hal;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -35,7 +37,8 @@ pub fn kernel_main() {
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");
-        use panic::hcf;
+        use hal::interface::instruct::hcf;
+
         kernel_test_main();
 
         hcf();

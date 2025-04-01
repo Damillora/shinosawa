@@ -1,6 +1,4 @@
 
-use core::arch::asm;
-
 use limine::BaseRevision;
 use limine::request::{RequestsEndMarker, RequestsStartMarker};
 
