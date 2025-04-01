@@ -23,8 +23,8 @@ impl SnFramebufferWriter {
         let logger = Self {
             display: display,
             x_pos: BORDER_PADDING,
-            y_pos: PROFONT_18_POINT.character_size.height as usize + BORDER_PADDING,
-            x_char: PROFONT_18_POINT.character_size.width as usize,
+            y_pos: PROFONT_18_POINT.character_size.height as usize,
+            x_char: PROFONT_18_POINT.character_size.width as usize + PROFONT_18_POINT.character_spacing as usize,
             y_char: PROFONT_18_POINT.character_size.height as usize,
         };
 
