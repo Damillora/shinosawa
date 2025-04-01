@@ -1,4 +1,4 @@
-use acpi::{AcpiHandler, AcpiTables};
+use acpi::{ AcpiTables};
 
 use crate::{hal::x86_64::acpi::SnAcpiHandler, printk, println};
 
@@ -10,8 +10,11 @@ pub fn init() {
 
         let acpi_table = unsafe { AcpiTables::from_rsdp(handler, addr) };
 
-        for acpi in acpi_table.unwrap().dsdt() {
-            println!("DSDT: {}", acpi.address);
+        if let Ok(acpi) = acpi_table.as_ref().unwrap().dsdt() {
+            printk!("acpi: DSDT: {:#x}", acpi.address);
+        }
+        for acpi in acpi_table.as_ref().unwrap().ssdts() {
+            printk!("acpi: SSDT: {:#x}", acpi.address);
         }
     }
 }

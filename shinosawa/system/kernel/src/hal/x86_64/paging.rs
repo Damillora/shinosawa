@@ -90,9 +90,27 @@ pub fn init_heap(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
 ) -> Result<(), MapToError<Size4KiB>> {
+    let start_addr = VirtAddr::new(HEAP_START as u64);
+    let end_addr = start_addr + HEAP_SIZE as u64 - 1u64;
+    
+    init_range(mapper, frame_allocator, start_addr, end_addr);
+    unsafe {
+        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
+    }
+
+    Ok(())
+}
+
+/// Create heap
+pub fn init_range(
+    mapper: &mut impl Mapper<Size4KiB>,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+    start_addr: VirtAddr,
+    end_addr: VirtAddr,
+) -> Result<(), MapToError<Size4KiB>> {
     let page_range = {
-        let heap_start = VirtAddr::new(HEAP_START as u64);
-        let heap_end = heap_start + HEAP_SIZE as u64 - 1u64;
+        let heap_start = start_addr.clone();
+        let heap_end = end_addr.clone();
         let heap_start_page = Page::containing_address(heap_start);
         let heap_end_page = Page::containing_address(heap_end);
         Page::range_inclusive(heap_start_page, heap_end_page)
@@ -106,10 +124,6 @@ pub fn init_heap(
         unsafe {
             mapper.map_to(page, frame, flags, frame_allocator)?.flush()
         };
-    }
-
-    unsafe {
-        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
     }
 
     Ok(())
