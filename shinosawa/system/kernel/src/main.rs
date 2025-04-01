@@ -8,8 +8,6 @@
 
 #![feature(abi_x86_interrupt)]
 
-use alloc::boxed::Box;
-
 extern crate alloc;
 
 /// Framebuffer module
@@ -28,6 +26,8 @@ mod tests;
 mod hal;
 /// Memory management
 mod memory;
+/// ACPI
+mod acpi;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -45,6 +45,8 @@ pub fn kernel_main() {
 
     hal::interface::cpu::init();
     hal::interface::paging::init();
+
+    crate::acpi::init();
 
     #[cfg(test)]
     {

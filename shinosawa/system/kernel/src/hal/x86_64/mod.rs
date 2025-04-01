@@ -6,3 +6,4 @@ pub mod interrupt;
 pub mod gdt;
 pub mod cpu;
 pub mod paging;
+pub mod acpi;

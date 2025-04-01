@@ -1,6 +1,6 @@
 
 use limine::BaseRevision;
-use limine::request::{FramebufferRequest, HhdmRequest, MemoryMapRequest, RequestsEndMarker, RequestsStartMarker};
+use limine::request::{FramebufferRequest, HhdmRequest, MemoryMapRequest, RequestsEndMarker, RequestsStartMarker, RsdpRequest};
 
 use crate::kernel_main;
 
@@ -23,6 +23,10 @@ pub static MEMORY_MAP_REQUEST: MemoryMapRequest = MemoryMapRequest::new();
 #[used]
 #[unsafe(link_section = ".requests")]
 pub static HHDM_REQUEST: HhdmRequest = HhdmRequest::new();
+
+#[used]
+#[unsafe(link_section = ".requests")]
+pub static RSDP_REQUEST: RsdpRequest = RsdpRequest::new();
 
 /// Define the stand and end markers for Limine requests.
 #[used]
