@@ -7,4 +7,4 @@ bindeps = true
 target = "x86_64-shinosawa.json"
 
 [target.'cfg(target_os = "none")']
-runner = "tools/brd.sh"
+runner = "tools/run.sh"
