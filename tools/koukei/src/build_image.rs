@@ -22,8 +22,8 @@ fn copy_efi_root(root_dir: &Dir<'_, &File>) {
             println!("rootfs: mkdir {}", entry_path);
             root_dir.create_dir(entry_path).unwrap();
         } else if entry.metadata().unwrap().is_file() {
-            println!("rootfs: cp {} {}",actual_path, entry_path);
-            let mut file = root_dir.create_file("efi/boot/bootx64.efi").unwrap();
+            println!("rootfs: cp {} {}", actual_path, entry_path);
+            let mut file = root_dir.create_file(entry_path).unwrap();
             file.truncate().unwrap();
             io::copy(&mut fs::File::open(actual_path).unwrap(), &mut file).unwrap();
         }
@@ -128,6 +128,7 @@ pub fn command(profile: String, kernel_image: Option<String>) {
         Some(str) => str,
         None => format!("target/{}/{}/kernel", TARGET, profile),
     };
+    println!("using kernel {}", kernel_path);
 
     create_fat_image(profile, kernel_path);
     create_gpt_image();
