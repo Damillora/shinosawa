@@ -3,7 +3,7 @@ use core::fmt;
 use conquer_once::spin::OnceCell;
 use spinning_top::Spinlock;
 
-use crate::{fb::writer::{self, SnFramebufferWriter}, log};
+use crate::fb::{display::SnFramebufferDisplay, writer::SnFramebufferWriter};
 
 
 /// The global logger instance used for the `log` crate.
@@ -23,7 +23,7 @@ impl SnLogger {
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::log::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::logger::_print(format_args!($($arg)*)));
 }
 
 #[macro_export]
@@ -45,4 +45,11 @@ pub fn _print(args: fmt::Arguments) {
 macro_rules! printk {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::println!("shinosawa::system::kernel: {}", format_args!($($arg)*)));
+}
+
+pub fn init(display: SnFramebufferDisplay) {
+    let mut writer = SnFramebufferWriter::new(display);
+    writer.clear();
+
+    LOGGER.init_once(move || SnLogger::new(writer));
 }
