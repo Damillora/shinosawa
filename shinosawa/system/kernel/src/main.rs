@@ -7,6 +7,7 @@
 #![reexport_test_harness_main = "kernel_test_main"]
 
 #![feature(abi_x86_interrupt)]
+#![feature(allocator_api)]
 
 extern crate alloc;
 

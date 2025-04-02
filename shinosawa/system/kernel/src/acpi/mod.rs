@@ -1,10 +1,56 @@
 use core::ptr::NonNull;
 
-use acpi::{AcpiHandler, AcpiTables, PhysicalMapping};
+use acpi::{fadt::Fadt, madt::Madt, AcpiHandler, AcpiTables, InterruptModel, PhysicalMapping};
+use conquer_once::spin::OnceCell;
 
 use crate::{
-    hal, memory::{alloc::ACPI_START, SnPhysAddr, SnVirtAddr}, printk
+    hal,
+    memory::{
+        SnPhysAddr, SnVirtAddr,
+        alloc::ACPI_START,
+    },
+    printk,
 };
+static HARDWARE_INFO: OnceCell<SnHardwareInfo> = OnceCell::uninit();
+
+pub struct SnHardwareInfo<'a> {
+    interrupt_model: InterruptModel<'a, alloc::alloc::Global>,
+    processor_info: Option<acpi::platform::ProcessorInfo<'a, alloc::alloc::Global>>
+}
+
+pub fn init() {
+    printk!("acpi: initializing");
+    if let Some(req) = crate::limine::RSDP_REQUEST.get_response() {
+        let addr = req.address();
+        let handler = SnAcpiHandler::new();
+
+        let acpi_result = unsafe { AcpiTables::from_rsdp(handler, addr) };
+        let acpi_table = acpi_result.as_ref().unwrap();
+
+        if let Ok(acpi) = acpi_table.dsdt() {
+            printk!("acpi: DSDT: {:#x}", acpi.address);
+        }
+        for acpi in acpi_table.ssdts() {
+            printk!("acpi: SSDT: {:#x}", acpi.address);
+        }
+
+        let madt = acpi_table.find_table::<Madt>().unwrap();
+        printk!("acpi: MADT: {:#x}", madt.physical_start());
+
+        let fadt = acpi_table.find_table::<Fadt>().unwrap();
+        printk!("acpi: FADT: {:#x}", fadt.physical_start());
+
+        let (interrupt_model, processor_info) = madt
+            .get()
+            .parse_interrupt_model_in(alloc::alloc::Global)
+            .unwrap();
+
+        HARDWARE_INFO.init_once(move || SnHardwareInfo {
+            interrupt_model: interrupt_model,
+            processor_info: processor_info,
+        });
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct SnAcpiHandler;
@@ -49,22 +95,5 @@ impl AcpiHandler for SnAcpiHandler {
         let end_addr = start_addr + region.region_length() as u64;
 
         hal::interface::paging::unmap_memory(start_addr, end_addr);
-    }
-}
-
-pub fn init() {
-    printk!("acpi: initializing");
-    if let Some(req) = crate::limine::RSDP_REQUEST.get_response() {
-        let addr = req.address();
-        let handler = SnAcpiHandler::new();
-
-        let acpi_table = unsafe { AcpiTables::from_rsdp(handler, addr) };
-
-        if let Ok(acpi) = acpi_table.as_ref().unwrap().dsdt() {
-            printk!("acpi: DSDT: {:#x}", acpi.address);
-        }
-        for acpi in acpi_table.as_ref().unwrap().ssdts() {
-            printk!("acpi: SSDT: {:#x}", acpi.address);
-        }
     }
 }

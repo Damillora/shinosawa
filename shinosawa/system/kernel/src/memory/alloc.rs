@@ -1,7 +1,7 @@
 // in src/allocator.rs
 
 pub const HEAP_START: usize = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 1024 * 1024; // 1 MiB
+pub const HEAP_SIZE: usize = 10 *1024 * 1024; // 10 MiB
 
 pub const ACPI_START: usize = 0x_3333_0000_0000;
 
@@ -12,7 +12,7 @@ use crate::printk;
 use super::SnVirtAddr;
 
 #[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+pub static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 /// Create heap for allocator
 pub fn init()  {
@@ -22,6 +22,7 @@ pub fn init()  {
 
     crate::hal::interface::paging::map_new_memory(start_addr, end_addr);
 
+    printk!("memory: initializing heap");
     unsafe {
         ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
     }
