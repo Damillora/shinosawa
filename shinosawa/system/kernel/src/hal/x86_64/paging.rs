@@ -74,6 +74,49 @@ pub fn init() {
     }
 }
 
+/// Map a single phys page
+pub fn map_phys_page(
+    phys_addr: SnPhysAddr,
+    virt_addr: SnVirtAddr,
+) {
+    let mut memory_info = MEMORY_INFO.get().unwrap().write();
+
+    let mut mapper: OffsetPageTable<'_> =
+        unsafe { init_page_table(memory_info.physical_memory_offset) };
+
+    let phys_addr_x86 = PhysAddr::new(phys_addr.as_u64());
+    let virt_addr_x86 = VirtAddr::new(virt_addr.as_u64());
+
+    map_phys_page_inner(
+        &mut mapper,
+        &mut memory_info.frame_allocator,
+        phys_addr_x86,
+        virt_addr_x86,
+    )
+    .expect("cannot map memory")
+}
+
+fn map_phys_page_inner(
+    mapper: &mut impl Mapper<Size4KiB>,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+    addr: PhysAddr,
+    virt: VirtAddr,
+) -> Result<(), MapToError<Size4KiB>> {
+    printk_s!(
+        "x86_64::paging: page {:x} {:x}",
+        addr.as_u64(),
+        virt.as_u64(),
+    );
+    
+    let page = Page::containing_address(virt);
+    let frame = PhysFrame::containing_address(addr);
+
+    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_CACHE;
+    unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
+    
+    Ok(())
+}
+
 pub fn map_new_memory(
     start_addr: SnVirtAddr,
     end_addr: SnVirtAddr,
