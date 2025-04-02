@@ -43,6 +43,7 @@ impl SnFramebufferDisplay {
     fn set_pixel_in(&mut self, position: Position, color: Color) {
         let pixel_offset = position.y * self.pitch as usize + position.x * (self.bpp / 8) as usize;
 
+
         let pixel_buffer = &mut self.buffer.lock()[pixel_offset..];
 
         pixel_buffer[3] = color.alpha;

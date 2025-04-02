@@ -189,7 +189,6 @@ unsafe fn map_phys_memory_inner(
     
             let map_to_result = unsafe {
                 // FIXME: this is not safe, we do it only for testing
-                // Identity map
                 mapper.map_to(page, frame, flags, frame_allocator) 
             };
             map_to_result.expect("map_to failed").flush();
@@ -200,6 +199,7 @@ unsafe fn map_phys_memory_inner(
 
     Ok(counter)
 }
+
 pub struct SnLimineFrameAllocator {
     memory_map: &'static [&'static memory_map::Entry],
     next: usize,
@@ -278,4 +278,10 @@ fn unmap_memory_inner(
         mapper.unmap(page).expect("cannot unmap").1.flush();
     }
 
+}
+
+pub fn phys_to_virt_addr(phys: PhysAddr) -> VirtAddr {
+    let memory_info = MEMORY_INFO.get().unwrap().read();
+
+    return memory_info.physical_memory_offset + phys.as_u64();
 }

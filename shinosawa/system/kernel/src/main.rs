@@ -58,7 +58,7 @@ pub fn kernel_main() {
     {
         use hal::interface::instruct::hcf;
         
-        printk!("kernel's finished. everything stands still.");
+        printk!("kernel's finished. everything stands");
         hcf();
     }
 }

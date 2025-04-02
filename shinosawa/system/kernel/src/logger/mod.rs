@@ -4,8 +4,7 @@ use conquer_once::spin::OnceCell;
 use spin::Mutex;
 
 use crate::{
-    fb::{display::SnFramebufferDisplay, writer::SnFramebufferWriter},
-    serial::SnSerialWriter,
+    fb::{display::SnFramebufferDisplay, writer::SnFramebufferWriter}, hal, serial::SnSerialWriter
 };
 
 /// The global logger instance used for the `log` crate.
@@ -43,11 +42,14 @@ pub fn _print(args: fmt::Arguments) {
     let logger_writer = LOGGER.get().unwrap().writer.as_ref();
     let logger_serial = LOGGER.get().unwrap().serial.as_ref();
 
-    let mut writer = logger_writer.unwrap().lock();
-    writer.write_fmt(args).unwrap();
+    hal::interface::interrupt::without_interrupts(|| {
+        let mut writer = logger_writer.unwrap().lock();
+        writer.write_fmt(args).unwrap();
 
-    let mut serial = logger_serial.unwrap().lock();
-    serial.write_fmt(args).unwrap();
+        let mut serial = logger_serial.unwrap().lock();
+        serial.write_fmt(args).unwrap();
+    });
+
 }
 
 pub fn _print_serial(args: fmt::Arguments) {
