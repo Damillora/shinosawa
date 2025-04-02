@@ -1,11 +1,11 @@
 use acpi::{platform::interrupt::InterruptSourceOverride, InterruptModel};
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
-use x2apic::{ioapic::{IoApic, IrqMode, RedirectionTableEntry}, lapic::{LocalApic, LocalApicBuilder}};
+use x2apic::{ioapic::IoApic, lapic::{LocalApic, LocalApicBuilder}};
 use x86_64::PhysAddr;
 
 use crate::{acpi::HARDWARE_INFO, hal::x86_64::{interrupt::InterruptIndex, paging::{self, map_phys_page}}, memory::{SnPhysAddr, SnVirtAddr}, printk};
-use core::{ops::{Deref, DerefMut}};
+use core::ops::{Deref, DerefMut};
 
 // FIXME: this is not sound
 pub struct UnsafeLocalApic(pub LocalApic);
@@ -54,13 +54,18 @@ pub fn init() {
         );
 
         let mut lapic = lapic.lock();
-        
+
         printk!("x86_64::apic: local APIC yeeee");
         unsafe {
             lapic.enable();
         }
 
         let lapic_id = unsafe { lapic.id() };
+
+        for f in 0..apic.interrupt_source_overrides.len() {
+            let iso: InterruptSourceOverride = apic.interrupt_source_overrides[f];
+            printk!("x86_64::apic: interrupt source override {} to {}", iso.isa_source, iso.global_system_interrupt );
+        }
 
         printk!("x86_64::apic: unleashing IO APIC");
         let io_apic_phys_address = apic.io_apics[0].address;
@@ -70,16 +75,7 @@ pub fn init() {
         let mut io_apic = unsafe { IoApic::new(io_apic_virt_address.as_u64()) };
 
         unsafe { io_apic.init(0) };
-
-        unsafe {
-            printk!("x86_64::apic: creating entry for IO APIC");
-            let mut entry = RedirectionTableEntry::default();
-            entry.set_mode(IrqMode::Fixed);
-            entry.set_dest(lapic_id as u8); 
-            io_apic.set_table_entry(0x01, entry);
         
-            io_apic.enable_irq(0x01);
-        }
 
     } else {
         printk!("x86_64::apic: this system does not use APIC, apparently");

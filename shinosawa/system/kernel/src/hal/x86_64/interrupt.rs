@@ -9,7 +9,6 @@ use x86_64::{
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
-use super::cpu::SnCpuContext;
 
 static IDT: OnceCell<InterruptDescriptorTable> = OnceCell::uninit();
 
