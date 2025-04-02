@@ -1,8 +1,7 @@
 use core::arch::naked_asm;
 
 use crate::{
-    hal::x86_64::{apic::LOCAL_APIC, gdt},
-    printk,
+    hal::x86_64::{apic::LOCAL_APIC, gdt}, memory::SnVirtAddr, print, printk
 };
 use conquer_once::spin::OnceCell;
 use x86_64::{
@@ -14,12 +13,17 @@ use super::cpu::SnCpuContext;
 
 static IDT: OnceCell<InterruptDescriptorTable> = OnceCell::uninit();
 
+pub static SCHEDULE: OnceCell<fn(usize) -> usize> = OnceCell::uninit();
+
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum InterruptIndex {
     ApicError = 0xfd,
     ApicTimer = 0xfe,
     ApicSpurious = 0xff,
+}
+pub enum InterruptStackIndex {
+    Timer = 0x01,
 }
 
 impl InterruptIndex {
@@ -99,9 +103,20 @@ extern "x86-interrupt" fn general_protection_fault_handler(
     panic!("general protection fault");
 }
 
-extern "C" fn timer_interrupt_handler(context: &mut SnCpuContext) {
-    let mut lapic = LOCAL_APIC.get().unwrap().lock();
-    unsafe { lapic.end_of_interrupt() };
+extern "C" fn timer_interrupt_handler(context_addr: usize) -> usize{
+    if SCHEDULE.is_initialized() {
+        let next_stack = (SCHEDULE.get().unwrap())(context_addr);
+        
+        let mut lapic = LOCAL_APIC.get().unwrap().lock();
+        unsafe { lapic.end_of_interrupt() };
+
+        return next_stack;
+    } else {
+        let mut lapic = LOCAL_APIC.get().unwrap().lock();
+        unsafe { lapic.end_of_interrupt() };
+
+        return 0;
+    }
 }
 
 #[naked]
@@ -134,6 +149,12 @@ pub extern "x86-interrupt" fn timer_interrupt_handler_preempt(_stack_frame: Inte
             "mov rdi, rsp",
             // Call the hander function
             "call {handler}",
+
+            // New: stack pointer is in RAX
+            "cmp rax, 0",
+            "je 2f",        // if rax != 0 {
+            "mov rsp, rax", //   rsp = rax;
+            "2:",           // }
 
             // Pop scratch registers
             "pop r15",
@@ -177,4 +198,8 @@ fn test_breakpoint_exception() {
 
 pub fn without_interrupts<T: FnOnce() -> ()>(a: T) {
     interrupts::without_interrupts(a);
+}
+
+pub fn set_interrupt_stack_table(index: usize, stack_end: SnVirtAddr) {
+    gdt::set_interrupt_stack_table(index, stack_end);
 }

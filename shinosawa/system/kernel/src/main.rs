@@ -51,6 +51,8 @@ pub fn kernel_main() {
 
     crate::hal::interface::cpu::init();
 
+    crate::process::thread::init();
+
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");
@@ -71,4 +73,19 @@ fn trivial_assertion() {
     printk!("trivial assertion... ");
     assert_eq!(1, 1);
     printk!("[ok]");
+}
+
+#[test_case]
+fn kernel_thread() {
+    fn test_kernel_fn2() {
+        printk!("we spawned another thread!");
+        loop {
+            print!(".");
+            x86_64::instructions::hlt();
+        }
+    }
+
+    // Launch another kernel thread
+    crate::process::thread::new_kernel_thread(test_kernel_fn2);
+
 }

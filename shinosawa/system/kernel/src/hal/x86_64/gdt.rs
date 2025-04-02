@@ -4,11 +4,12 @@ use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable};
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::{VirtAddr, structures::gdt::SegmentSelector};
 
+use crate::hal::x86_64::interrupt::InterruptStackIndex;
+use crate::memory::SnVirtAddr;
 use crate::printk;
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 pub const GENERAL_PROTECTION_FAULT_IST_INDEX: u16 = 0;
-pub const TIMER_INTERRUPT_INDEX: u16 = 1; // New
 
 static TSS: OnceCell<Mutex<TaskStateSegment>> = OnceCell::uninit();
 static GDT: OnceCell<(GlobalDescriptorTable, Selectors)> = OnceCell::uninit();
@@ -18,7 +19,8 @@ unsafe fn tss_reference() -> &'static TaskStateSegment {
     unsafe { &*tss_ptr }
 }
 
-pub fn set_interrupt_stack_table(index: usize, stack_end: VirtAddr) {
+pub fn set_interrupt_stack_table(index: usize, stack_end: SnVirtAddr) {
+    let stack_end = VirtAddr::new(stack_end.as_u64());
     TSS.get().unwrap().lock().interrupt_stack_table[index] = stack_end;
 }
 
@@ -43,7 +45,7 @@ pub fn init() {
             stack_end
         };
 
-        tss.interrupt_stack_table[TIMER_INTERRUPT_INDEX as usize] =
+        tss.interrupt_stack_table[InterruptStackIndex::Timer as usize] =
             tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize]; // New
 
         Mutex::new(tss)
