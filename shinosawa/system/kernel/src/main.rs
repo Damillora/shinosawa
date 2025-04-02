@@ -59,6 +59,17 @@ pub fn kernel_main() {
 
         kernel_test_main();
     }
+    
+    fn test_kernel_fn2() {
+        printk!("spawning child kerne! process to forever stand. only dots remain.");
+        loop {
+            print!(".");
+            x86_64::instructions::hlt();
+        }
+    }
+
+    // Launch another kernel thread
+    crate::process::thread::new_kernel_thread(test_kernel_fn2);
 
     {
         use hal::interface::instruct::hcf;
@@ -80,7 +91,7 @@ fn kernel_thread() {
     fn test_kernel_fn2() {
         printk!("we spawned another thread!");
         loop {
-            print!(".");
+            print!("/");
             x86_64::instructions::hlt();
         }
     }
