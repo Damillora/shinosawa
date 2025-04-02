@@ -1,6 +1,5 @@
 use crate::{hal::x86_64::gdt, print, printk};
 use lazy_static::lazy_static;
-use pic8259::ChainedPics;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
 lazy_static! {
