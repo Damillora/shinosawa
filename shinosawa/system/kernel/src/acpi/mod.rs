@@ -11,11 +11,13 @@ use crate::{
     },
     printk,
 };
-static HARDWARE_INFO: OnceCell<SnHardwareInfo> = OnceCell::uninit();
 
+pub static HARDWARE_INFO: OnceCell<SnHardwareInfo> = OnceCell::uninit();
+
+#[derive(Clone)]
 pub struct SnHardwareInfo<'a> {
-    interrupt_model: InterruptModel<'a, alloc::alloc::Global>,
-    processor_info: Option<acpi::platform::ProcessorInfo<'a, alloc::alloc::Global>>
+    pub interrupt_model: InterruptModel<'a, alloc::alloc::Global>,
+    pub processor_info: Option<acpi::platform::ProcessorInfo<'a, alloc::alloc::Global>>
 }
 
 pub fn init() {

@@ -42,11 +42,11 @@ pub fn kernel_main() {
         printk!("written by someone least cut out for it.");
     }
 
-    hal::interface::paging::init();
-    memory::alloc::init();
+    crate::hal::interface::paging::init();
+    crate::memory::alloc::init();
     crate::acpi::init();
 
-    hal::interface::cpu::init();
+    crate::hal::interface::cpu::init();
 
     #[cfg(test)]
     {

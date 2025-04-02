@@ -10,3 +10,5 @@ pub mod paging;
 
 /// x86_64 GDT setup
 mod gdt;
+/// Intel APIC
+mod apic;
