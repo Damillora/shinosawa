@@ -43,12 +43,39 @@ pub fn new_kernel_thread(function: fn()->()) {
             context})
     };
 
-    unsafe { crate::hal::interface::cpu::set_context(new_thread.context, function as u64, new_thread.user_stack_end) };
+    unsafe { crate::hal::interface::cpu::set_context(new_thread.context, function as u64, new_thread.user_stack_end, false) };
 
     crate::hal::interface::interrupt::without_interrupts(|| {
         RUNNING_QUEUE.get().unwrap().write().push_back(new_thread);
     });
 }
+
+pub fn new_user_thread(function: fn()->()) {
+    printk!("process: spawning new user thread {:x}", function as u64);
+    let new_thread = {
+        let kernel_stack = Vec::with_capacity(KERNEL_STACK_SIZE as usize);
+        let kernel_stack_end = (SnVirtAddr::from_ptr(kernel_stack.as_ptr())
+                               + KERNEL_STACK_SIZE).as_u64();
+        let user_stack = Vec::with_capacity(USER_STACK_SIZE as usize);
+        let user_stack_end = (SnVirtAddr::from_ptr(user_stack.as_ptr())
+                              + USER_STACK_SIZE).as_u64();
+        let context = kernel_stack_end - INTERRUPT_CONTEXT_SIZE as u64;
+
+        Box::new(Thread {
+            kernel_stack,
+            user_stack,
+            kernel_stack_end,
+            user_stack_end,
+            context})
+    };
+
+    unsafe { crate::hal::interface::cpu::set_context(new_thread.context, function as u64, new_thread.user_stack_end, true)};
+
+    crate::hal::interface::interrupt::without_interrupts(|| {
+        RUNNING_QUEUE.get().unwrap().write().push_back(new_thread);
+    });
+}
+
 
 /// Adds a thread to the front of the running queue
 /// so it will be scheduled next

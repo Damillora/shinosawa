@@ -28,6 +28,8 @@ struct Selectors {
     code_selector: SegmentSelector,
     tss_selector: SegmentSelector,
     data_selector: SegmentSelector,
+    user_code_selector: SegmentSelector,
+    user_data_selector: SegmentSelector,
 }
 
 pub fn init() {
@@ -57,12 +59,16 @@ pub fn init() {
         let code_selector = gdt.append(Descriptor::kernel_code_segment());
         let data_selector = gdt.append(Descriptor::kernel_data_segment());
         let tss_selector = gdt.append(Descriptor::tss_segment(unsafe { tss_reference() }));
+        let user_code_selector = gdt.append(Descriptor::user_code_segment());
+        let user_data_selector = gdt.append(Descriptor::user_data_segment()); 
         (
             gdt,
             Selectors {
                 code_selector,
                 tss_selector,
                 data_selector,
+                user_code_selector,
+                user_data_selector,
             },
         )
     });
@@ -80,4 +86,8 @@ pub fn get_kernel_segments() -> (SegmentSelector, SegmentSelector) {
         GDT.get().unwrap().1.code_selector,
         GDT.get().unwrap().1.data_selector,
     )
+}
+
+pub fn get_user_segments() -> (SegmentSelector, SegmentSelector) {
+    (GDT.get().unwrap().1.user_code_selector, GDT.get().unwrap().1.user_data_selector)
 }
