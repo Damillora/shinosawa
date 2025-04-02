@@ -166,6 +166,9 @@ pub extern "x86-interrupt" fn timer_interrupt_handler_preempt(_stack_frame: Inte
     }
 }
 
+/// Number of bytes needed to store a Context struct
+pub const INTERRUPT_CONTEXT_SIZE: usize = 20 * 8;
+
 #[test_case]
 fn test_breakpoint_exception() {
     // invoke a breakpoint exception

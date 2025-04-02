@@ -69,6 +69,13 @@ impl SnVirtAddr {
     pub const fn as_mut_ptr<T>(self) -> *mut T {
         self.as_ptr::<T>() as *mut T
     }
+
+    /// Creates a virtual address from the given pointer
+    #[cfg(target_pointer_width = "64")]
+    #[inline]
+    pub fn from_ptr<T: ?Sized>(ptr: *const T) -> Self {
+        Self::new(ptr as *const () as u64)
+    }
 }
 
 #[derive(Clone, Copy)]

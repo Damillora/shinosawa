@@ -30,6 +30,8 @@ mod hal;
 mod memory;
 /// ACPI
 mod acpi;
+/// Process management
+mod process;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

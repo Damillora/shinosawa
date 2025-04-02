@@ -41,3 +41,17 @@ pub struct SnCpuContext {
     ss: usize,      // Stack segment
     // Here the CPU may push values to align the stack on a 16-byte boundary (for SSE)
 }
+
+pub unsafe fn set_context(context_addr: u64, function: u64, user_stack_end: u64) {
+
+    // Set context registers
+    // Add Thread to RUNNING_QUEUE
+    let context = unsafe {&mut *(context_addr as *mut SnCpuContext)};
+    context.rip = function as usize; // Instruction pointer
+    context.rsp = user_stack_end as usize; // Stack pointer
+    context.rflags = 0x200; // Interrupts enabled
+
+    let (code_selector, data_selector) = gdt::get_kernel_segments();
+    context.cs = code_selector.0 as usize;
+    context.ss = data_selector.0 as usize;
+}
