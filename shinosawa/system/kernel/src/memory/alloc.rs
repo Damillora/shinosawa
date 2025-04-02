@@ -1,18 +1,18 @@
 // in src/allocator.rs
 
+
+use crate::printk;
+
+use super::{linked_list::LinkedListAllocator, Locked, SnVirtAddr};
+
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 10 *1024 * 1024; // 10 MiB
 
 pub const ACPI_START: usize = 0x_3333_0000_0000;
 
-use linked_list_allocator::LockedHeap;
-
-use crate::printk;
-
-use super::SnVirtAddr;
-
 #[global_allocator]
-pub static ALLOCATOR: LockedHeap = LockedHeap::empty();
+static ALLOCATOR: Locked<LinkedListAllocator> =
+    Locked::new(LinkedListAllocator::new());
 
 /// Create heap for allocator
 pub fn init()  {
