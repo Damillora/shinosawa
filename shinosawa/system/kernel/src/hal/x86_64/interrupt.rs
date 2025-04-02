@@ -1,4 +1,4 @@
-use crate::{hal::x86_64::{apic::LOCAL_APIC, gdt}, print, printk};
+use crate::{hal::x86_64::{apic::LOCAL_APIC, gdt}, print, print_s, printk};
 use conquer_once::spin::OnceCell;
 use x86_64::{instructions::interrupts, structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode}};
 
@@ -75,7 +75,6 @@ extern "x86-interrupt" fn page_fault_handler(
 }
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    print!(".");
     let mut lapic =LOCAL_APIC.get().unwrap().lock();
     unsafe { lapic.end_of_interrupt() };
     // lapic.end_of_interrupt();
