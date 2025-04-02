@@ -60,7 +60,7 @@ pub fn kernel_main() {
         kernel_test_main();
     }
     
-    fn test_kernel_fn2() {
+    fn forever_stand() {
         printk!("spawning child kerne! process to forever stand. only dots remain.");
         loop {
             print!(".");
@@ -69,7 +69,7 @@ pub fn kernel_main() {
     }
 
     // Launch another kernel thread
-    crate::process::thread::new_kernel_thread(test_kernel_fn2);
+    crate::process::thread::new_kernel_thread(forever_stand);
 
     {
         use hal::interface::instruct::hcf;
@@ -84,19 +84,4 @@ fn trivial_assertion() {
     printk!("trivial assertion... ");
     assert_eq!(1, 1);
     printk!("[ok]");
-}
-
-#[test_case]
-fn kernel_thread() {
-    fn test_kernel_fn2() {
-        printk!("we spawned another thread!");
-        loop {
-            print!("/");
-            x86_64::instructions::hlt();
-        }
-    }
-
-    // Launch another kernel thread
-    crate::process::thread::new_kernel_thread(test_kernel_fn2);
-
 }
