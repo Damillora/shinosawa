@@ -45,6 +45,7 @@ pub fn kernel_main() {
 
     hal::interface::cpu::init();
     hal::interface::paging::init();
+    memory::alloc::init();
 
     crate::acpi::init();
 

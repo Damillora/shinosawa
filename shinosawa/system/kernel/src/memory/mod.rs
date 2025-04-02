@@ -1,26 +1,25 @@
-use core::fmt::{self, Debug};
-
-use ::alloc::{boxed::Box,  vec, rc::Rc, vec::Vec};
-
-use crate::{hal, printk};
+use core::{fmt::{self, Debug}, ops::{Add, Sub}};
 
 pub mod alloc;
 
-pub trait SnAddr: Debug {
-    fn as_u64(&self) -> u64;
-
-    fn new(addr: u64) -> Self;
-}
+#[derive(Clone, Copy)]
 pub struct SnVirtAddr(u64);
 
-impl SnAddr for SnVirtAddr {
-    fn as_u64(&self) -> u64 {
-        self.0
+impl Add<u64> for SnVirtAddr {
+    type Output = SnVirtAddr;
+
+    fn add(self, rhs: u64) -> Self::Output {
+        return SnVirtAddr::new(self.as_u64() + rhs)
+    }
+}
+
+impl Sub<u64> for SnVirtAddr {
+    type Output = SnVirtAddr;
+    
+    fn sub(self, rhs: u64) -> Self::Output {
+        return SnVirtAddr::new(self.as_u64() + rhs)
     }
 
-    fn new(addr: u64) -> Self {
-        Self(addr)
-    }
 }
 
 impl Debug for SnVirtAddr {
@@ -29,14 +28,38 @@ impl Debug for SnVirtAddr {
     }
 }
 
+impl SnVirtAddr {
+    pub const fn as_u64(&self) -> u64 {
+        self.0
+    }
+
+    pub const fn new(addr: u64) -> Self {
+        Self(addr)
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[inline]
+    pub const fn as_ptr<T>(self) -> *const T {
+        self.as_u64() as *const T
+    }
+
+    /// Converts the address to a mutable raw pointer.
+    #[cfg(target_pointer_width = "64")]
+    #[inline]
+    pub const fn as_mut_ptr<T>(self) -> *mut T {
+        self.as_ptr::<T>() as *mut T
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct SnPhysAddr(u64);
 
-impl SnAddr for SnPhysAddr {
-    fn as_u64(&self) -> u64 {
+impl SnPhysAddr {
+    pub const fn as_u64(&self) -> u64 {
         return self.0;
     }
 
-    fn new(addr: u64) -> Self {
+    pub const fn new(addr: u64) -> Self {
         Self(addr)
     }
 }
@@ -47,9 +70,13 @@ impl Debug for SnPhysAddr {
     }
 }
 
+
+
 #[test_case]
 fn test_memory_alloc() {
-    
+    use ::alloc::{boxed::Box,  vec, rc::Rc, vec::Vec};
+    use crate::printk;
+
     // allocate a number on the heap
     let heap_value = Box::new(41);
     printk!("heap_value at {:p}", heap_value);

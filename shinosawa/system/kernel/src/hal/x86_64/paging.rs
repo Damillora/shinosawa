@@ -2,14 +2,18 @@
 
 use limine::memory_map::{self, EntryType};
 use x86_64::{
+    PhysAddr, VirtAddr,
     structures::paging::{
-        mapper::MapToError, FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame, Size4KiB
-    }, PhysAddr, VirtAddr
+        FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame,
+        Size4KiB, mapper::MapToError,
+    },
 };
 
 use crate::{
     limine::MEMORY_MAP_REQUEST,
-    memory::alloc::{HEAP_SIZE, HEAP_START},
+    memory::{
+        SnPhysAddr, SnVirtAddr,
+    },
     printk,
 };
 
@@ -31,18 +35,12 @@ pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static
     unsafe { &mut *page_table_ptr }
 }
 
-use linked_list_allocator::LockedHeap;
-
-#[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
-
 pub struct MemoryInfo {
     pub physical_memory_offset: VirtAddr,
 
     /// Allocate empty frames
     pub frame_allocator: SnLimineFrameAllocator,
     kernel_l4_table: &'static mut PageTable,
-
 }
 
 pub static mut MEMORY_INFO: Option<MemoryInfo> = None;
@@ -56,58 +54,59 @@ pub unsafe fn init_page_table(physical_memory_offset: VirtAddr) -> OffsetPageTab
 
 pub fn init() {
     if let Some(res) = crate::limine::HHDM_REQUEST.get_response() {
-        let physical_memory_offset = VirtAddr::new(res.offset());// Store boot_info for later calls
-        
+        let physical_memory_offset = VirtAddr::new(res.offset()); // Store boot_info for later calls
+
         if let Some(resp) = MEMORY_MAP_REQUEST.get_response() {
             let frame_allocator = unsafe { SnLimineFrameAllocator::init(resp.entries()) };
 
-            let mut page_table: OffsetPageTable<'_> = unsafe { init_page_table(physical_memory_offset) };
-
-            unsafe { MEMORY_INFO = Some(MemoryInfo {
-                physical_memory_offset,
-                frame_allocator,
-                kernel_l4_table: active_level_4_table(physical_memory_offset),
-            }) };
-
-            // FIXME: Static mutable here, must there be something better
-            #[allow(static_mut_refs)]
-            let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
-            
-            printk!("x86_64: initializing kernel heap");
-            init_heap(&mut page_table, &mut memory_info.frame_allocator)
-                .expect("heap initialization failed");
-
+            unsafe {
+                MEMORY_INFO = Some(MemoryInfo {
+                    physical_memory_offset,
+                    frame_allocator,
+                    kernel_l4_table: active_level_4_table(physical_memory_offset),
+                })
+            };
         }
-        
     } else {
         panic!("cannot get HHDM");
     }
+}
 
+pub fn map_new_memory(
+    start_addr: SnVirtAddr,
+    end_addr: SnVirtAddr,
+) {
+    // FIXME: Static mutable here, must there be something better
+    #[allow(static_mut_refs)]
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+
+    let mut mapper: OffsetPageTable<'_> =
+        unsafe { init_page_table(memory_info.physical_memory_offset) };
+
+    let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
+    let end_addr_x86 = VirtAddr::new(end_addr.as_u64());
+
+    map_new_memory_inner(
+        &mut mapper,
+        &mut memory_info.frame_allocator,
+        start_addr_x86,
+        end_addr_x86,
+    )
+    .expect("cannot map memory")
 }
 
 /// Create heap
-pub fn init_heap(
-    mapper: &mut impl Mapper<Size4KiB>,
-    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
-) -> Result<(), MapToError<Size4KiB>> {
-    let start_addr = VirtAddr::new(HEAP_START as u64);
-    let end_addr = start_addr + HEAP_SIZE as u64 - 1u64;
-    
-    init_range(mapper, frame_allocator, start_addr, end_addr);
-    unsafe {
-        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
-    }
-
-    Ok(())
-}
-
-/// Create heap
-pub fn init_range(
+fn map_new_memory_inner(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
     start_addr: VirtAddr,
     end_addr: VirtAddr,
 ) -> Result<(), MapToError<Size4KiB>> {
+    printk!(
+        "x86_64::paging: new_map {:x}-{:x}",
+        start_addr.as_u64(),
+        end_addr.as_u64()
+    );
     let page_range = {
         let heap_start = start_addr.clone();
         let heap_end = end_addr.clone();
@@ -121,14 +120,87 @@ pub fn init_range(
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe {
-            mapper.map_to(page, frame, flags, frame_allocator)?.flush()
-        };
+        unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
     }
 
     Ok(())
 }
 
+/// Maps physical memory 
+/// This one skips through mapped pages, so mark this as unsafe
+pub unsafe fn map_phys_memory(
+    start_addr: SnVirtAddr,
+    end_addr: SnVirtAddr,
+    phys_addr_start: SnPhysAddr,
+    size: usize,
+) -> u64 {
+    // FIXME: Static mutable here, must there be something better
+    #[allow(static_mut_refs)]
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+
+    let mut mapper: OffsetPageTable<'_> =
+        unsafe { init_page_table(memory_info.physical_memory_offset) };
+
+    let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
+    let end_addr_x86 = VirtAddr::new(end_addr.as_u64());
+    let phys_addr_start_x86 = PhysAddr::new(phys_addr_start.as_u64());
+
+    unsafe { map_phys_memory_inner(
+        &mut mapper,
+        &mut memory_info.frame_allocator,
+        start_addr_x86,
+        end_addr_x86,
+        phys_addr_start_x86,
+        size,
+    )
+    .expect("cannot map memory") }
+}
+
+unsafe fn map_phys_memory_inner(
+    mapper: &mut impl Mapper<Size4KiB>,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+    start_addr: VirtAddr,
+    end_addr: VirtAddr,
+    phys_addr_start: PhysAddr,
+    size: usize,
+) -> Result<u64, MapToError<Size4KiB>> {
+    printk!(
+        "x86_64::paging: phys_map {:x} size {:#} to {:x}-{:x}",
+        phys_addr_start.as_u64(),
+        size,
+        start_addr.as_u64(),
+        end_addr.as_u64()
+    );
+    let page_range = {
+        let start = start_addr.clone();
+        let end = end_addr.clone();
+        let start_page = Page::containing_address(start);
+        let end_page = Page::containing_address(end);
+        Page::range_inclusive(start_page, end_page)
+    };
+
+    let flags =
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
+
+    let mut counter = 0;
+    for page in page_range {
+        if let Err(_) = mapper.translate_page(page) {
+            let frame: PhysFrame<Size4KiB> =
+                PhysFrame::containing_address(PhysAddr::new(phys_addr_start.as_u64() as u64 + counter));
+    
+            let map_to_result = unsafe {
+                // FIXME: this is not safe, we do it only for testing
+                // Identity map
+                mapper.map_to(page, frame, flags, frame_allocator) 
+            };
+            map_to_result.expect("map_to failed").flush();
+        }
+
+        counter += page.size();
+    }
+
+    Ok(counter)
+}
 pub struct SnLimineFrameAllocator {
     memory_map: &'static [&'static memory_map::Entry],
     next: usize,
@@ -140,7 +212,9 @@ impl SnLimineFrameAllocator {
     /// This function is unsafe because the caller must guarantee that the passed
     /// memory map is valid. The main requirement is that all frames that are marked
     /// as `USABLE` in it are really unused.
-    pub unsafe fn init(memory_map: &'static [&'static memory_map::Entry]) -> SnLimineFrameAllocator {
+    pub unsafe fn init(
+        memory_map: &'static [&'static memory_map::Entry],
+    ) -> SnLimineFrameAllocator {
         SnLimineFrameAllocator {
             memory_map,
             next: 0,
@@ -167,4 +241,43 @@ unsafe impl FrameAllocator<Size4KiB> for SnLimineFrameAllocator {
         self.next += 1;
         frame
     }
+}
+
+pub fn unmap_memory(
+    start_addr: SnVirtAddr,
+    end_addr: SnVirtAddr,
+) {
+    // FIXME: Static mutable here, must there be something better
+    #[allow(static_mut_refs)]
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let mut mapper = unsafe { init_page_table(memory_info.physical_memory_offset) };
+    
+    let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
+    let end_addr_x86 = VirtAddr::new(end_addr.as_u64());
+    unmap_memory_inner(&mut mapper, start_addr_x86, end_addr_x86);
+}
+
+fn unmap_memory_inner(
+    mapper: &mut impl Mapper<Size4KiB>,
+    start_addr: VirtAddr,
+    end_addr: VirtAddr,
+) {
+    printk!(
+        "x86_64::paging: unmap {:x}-{:x}",
+        start_addr.as_u64(),
+        end_addr.as_u64()
+    );
+
+    let page_range = {
+        let start = start_addr.clone();
+        let end = end_addr.clone();
+        let start_page = Page::containing_address(start);
+        let end_page = Page::containing_address(end);
+        Page::range_inclusive(start_page, end_page)
+    };
+
+    for page in page_range {
+        mapper.unmap(page).expect("cannot unmap").1.flush();
+    }
+
 }

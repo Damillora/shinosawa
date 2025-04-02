@@ -7,14 +7,21 @@ pub const HEAP_SIZE: usize = 1024 * 1024; // 1 MiB
 
 pub const ACPI_START: usize = 0x_3333_0000_0000;
 
-pub struct Dummy;
+use linked_list_allocator::LockedHeap;
 
-unsafe impl GlobalAlloc for Dummy {
-    unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-        null_mut()
-    }
+use super::SnVirtAddr;
 
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        panic!("dealloc should be never called")
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty();
+
+/// Create heap for allocator
+pub fn init()  {
+    let start_addr = SnVirtAddr::new(HEAP_START as u64);
+    let end_addr = start_addr + HEAP_SIZE as u64 - 1u64;
+
+    crate::hal::interface::paging::map_new_memory(start_addr, end_addr);
+
+    unsafe {
+        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
     }
 }
