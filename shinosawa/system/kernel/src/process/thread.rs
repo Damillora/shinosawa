@@ -17,9 +17,9 @@ struct Thread {
     context: u64, // Address of Context on kernel stack
 }
 
-static RUNNING_QUEUE: OnceCell<RwLock<VecDeque<Thread>>> = OnceCell::new(RwLock::new(VecDeque::new()));
+static RUNNING_QUEUE: OnceCell<RwLock<VecDeque<Box<Thread>>>> = OnceCell::new(RwLock::new(VecDeque::new()));
 
-static CURRENT_THREAD: RwLock<Option<Thread>> = RwLock::new(None);
+static CURRENT_THREAD: RwLock<Option<Box<Thread>>> = RwLock::new(None);
 
 const KERNEL_STACK_SIZE: u64 = 4096 * 2;
 const USER_STACK_SIZE: u64 = 4096 * 5;
@@ -46,9 +46,19 @@ pub fn new_kernel_thread(function: fn()->()) {
     unsafe { crate::hal::interface::cpu::set_context(new_thread.context, function as u64, new_thread.user_stack_end) };
 
     crate::hal::interface::interrupt::without_interrupts(|| {
-        RUNNING_QUEUE.get().unwrap().write().push_back(*new_thread);
+        RUNNING_QUEUE.get().unwrap().write().push_back(new_thread);
     });
 }
+
+/// Adds a thread to the front of the running queue
+/// so it will be scheduled next
+pub fn schedule_thread(thread: Box<Thread>) {
+    // Turn off interrupts while modifying process table
+    crate::hal::interface::interrupt::without_interrupts(|| {
+        RUNNING_QUEUE.get().unwrap().write().push_front(thread);
+    });
+}
+
 fn schedule_next(context_addr: usize) -> usize {
     let mut running_queue = RUNNING_QUEUE.get().unwrap().write();
     let mut current_thread = CURRENT_THREAD.write();
@@ -59,7 +69,7 @@ fn schedule_next(context_addr: usize) -> usize {
         // Put to the back of the queue
         running_queue.push_back(thread);
     }
-    // Get the next thread in the queue
+    
     *current_thread = running_queue.pop_front();
     match current_thread.as_ref() {
         Some(thread) => {
