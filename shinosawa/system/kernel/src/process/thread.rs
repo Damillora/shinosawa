@@ -25,6 +25,7 @@ const KERNEL_STACK_SIZE: u64 = 4096 * 2;
 const USER_STACK_SIZE: u64 = 4096 * 5;
 
 pub fn new_kernel_thread(function: fn()->()) {
+    printk!("process: spawning new kernel thread {:x}", function as u64);
     let new_thread = {
         let kernel_stack = Vec::with_capacity(KERNEL_STACK_SIZE as usize);
         let kernel_stack_end = (SnVirtAddr::from_ptr(kernel_stack.as_ptr())

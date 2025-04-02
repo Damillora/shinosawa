@@ -1,27 +1,34 @@
 use core::fmt;
 
 use conquer_once::spin::OnceCell;
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 
 use crate::{
     fb::{display::SnFramebufferDisplay, writer::SnFramebufferWriter}, hal, serial::SnSerialWriter
 };
 
 /// The global logger instance used for the `log` crate.
-pub static LOGGER: OnceCell<SnLogger> = OnceCell::uninit();
+pub static LOGGER: OnceCell<RwLock<SnLogger>> = OnceCell::uninit();
 
 /// A logger instance protected by a spinlock.
 pub struct SnLogger {
-    pub writer: Option<Mutex<SnFramebufferWriter>>,
+    pub fb: Option<Mutex<SnFramebufferWriter>>,
     pub serial: Option<Mutex<SnSerialWriter>>,
 }
 
 impl SnLogger {
-    pub fn new(writer: SnFramebufferWriter, serial: SnSerialWriter) -> SnLogger {
+    pub fn new() -> SnLogger {
         SnLogger {
-            writer: Some(Mutex::new(writer)),
-            serial: Some(Mutex::new(serial)),
+            fb: None,
+            serial: None,
         }
+    }
+    pub fn add_fb(&mut self, writer: SnFramebufferWriter) {
+        self.fb = Some(Mutex::new(writer));
+    }
+
+    pub fn add_serial(&mut self, serial: SnSerialWriter) {
+        self.serial = Some(Mutex::new(serial));
     }
 }
 
@@ -38,23 +45,28 @@ macro_rules! println {
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
+    if !LOGGER.is_initialized() { return }
+    
     use core::fmt::Write;
-    let logger_writer = LOGGER.get().unwrap().writer.as_ref();
-    let logger_serial = LOGGER.get().unwrap().serial.as_ref();
-
+    let logger = LOGGER.get().unwrap().read();
     hal::interface::interrupt::without_interrupts(|| {
-        let mut writer = logger_writer.unwrap().lock();
-        writer.write_fmt(args).unwrap();
-
-        let mut serial = logger_serial.unwrap().lock();
-        serial.write_fmt(args).unwrap();
+        if let Some(logger_writer) = &logger.fb {
+            let mut writer = logger_writer.lock();
+            writer.write_fmt(args).unwrap();
+        }
+        if let Some(logger_serial) = &logger.serial {
+            let mut serial = logger_serial.lock();
+            serial.write_fmt(args).unwrap();
+        }
     });
-
 }
 
 pub fn _print_serial(args: fmt::Arguments) {
+    if !LOGGER.is_initialized() { return }
+
     use core::fmt::Write;
-    let logger_serial = LOGGER.get().unwrap().serial.as_ref();
+    let logger = LOGGER.get().unwrap().read();
+    let logger_serial = logger.serial.as_ref();
 
     let mut serial = logger_serial.unwrap().lock();
     serial.write_fmt(args).unwrap();
@@ -76,9 +88,21 @@ macro_rules! printk {
     ($($arg:tt)*) => ($crate::println!("shinosawa::system::kernel: {}", format_args!($($arg)*)));
 }
 
-pub fn init(display: SnFramebufferDisplay, serial: SnSerialWriter) {
+pub fn init() {
+    LOGGER.init_once(move || RwLock::new(SnLogger::new()));
+}
+
+pub fn set_fb(display: SnFramebufferDisplay) {
     let mut writer = SnFramebufferWriter::new(display);
     writer.clear();
 
-    LOGGER.init_once(move || SnLogger::new(writer, serial));
+    let mut logger = LOGGER.get().unwrap().write();
+
+    logger.add_fb(writer);
+}
+
+pub fn set_serial(serial: SnSerialWriter) {
+    let mut logger = LOGGER.get().unwrap().write();
+
+    logger.add_serial(serial);
 }

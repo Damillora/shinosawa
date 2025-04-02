@@ -10,6 +10,8 @@
 #![feature(allocator_api)]
 #![feature(naked_functions)]
 
+use hal::x86_64::instruct::hcf;
+
 extern crate alloc;
 
 /// Framebuffer module
@@ -35,16 +37,20 @@ mod process;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn kernel_main() {
-    let display = fb::init().unwrap();
+pub fn init() {
+    logger::init();
+    
     let serial = unsafe { serial::init() };
-    logger::init(display, serial);
+    logger::set_serial(serial);
+
+    let display = fb::init().unwrap();
+    logger::set_fb(display);
+
     {
         printk!("shinosawa::system::kernel {}", VERSION);
         printk!("an operating system for those who find joy in things that don't go well,");
         printk!("written by someone least cut out for it.");
     }
-
     crate::hal::interface::paging::init();
     crate::memory::alloc::init();
     crate::acpi::init();
@@ -53,6 +59,13 @@ pub fn kernel_main() {
 
     crate::process::thread::init();
 
+    // We can *actually* start a kernel process now.
+    crate::process::thread::new_kernel_thread(kernel_main);
+
+    hcf();
+}
+
+pub fn kernel_main() {
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");

@@ -2,7 +2,7 @@
 use limine::BaseRevision;
 use limine::request::{FramebufferRequest, HhdmRequest, MemoryMapRequest, RequestsEndMarker, RequestsStartMarker, RsdpRequest};
 
-use crate::kernel_main;
+use crate::init;
 
 /// Sets the base revision to the latest revision supported by the crate.
 /// See specification for further info.
@@ -42,7 +42,7 @@ unsafe extern "C" fn kmain() -> ! {
     // removed by the linker.
     assert!(BASE_REVISION.is_supported());
 
-    kernel_main();
+    init();
     
     panic!("kmain somehow exited");
 }
