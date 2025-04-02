@@ -1,7 +1,7 @@
 use core::fmt;
 
 use embedded_graphics::{
-    mono_font::{MonoFont, MonoTextStyle}, pixelcolor::Rgb888, prelude::Point, text::Text, Drawable, Pixel
+    mono_font::{MonoFont, MonoTextStyle}, pixelcolor::Rgb888, prelude::*, primitives::{PrimitiveStyleBuilder, Rectangle}, text::Text, Drawable, Pixel
 };
 
 const FONT: MonoFont<'_> = embedded_graphics::mono_font::ascii::FONT_9X18;
@@ -77,12 +77,12 @@ impl SnFramebufferWriter {
     }
 
     pub fn clear(&mut self) {
-        for i in 0..self.display.height {
-            for j in 0..self.display.width {
-                self.display.draw_pixel(Pixel(Point { x: j as i32, y: i as i32}, Rgb888::new(0x00, 0xaf, 0xcc)));
-            }
-        }
-
+        let style = PrimitiveStyleBuilder::new()
+                .fill_color(Rgb888::new(0x00, 0xaf, 0xcc))
+                .build();
+        Rectangle::new(Point::new(0, 0), Size::new(self.width() as u32, self.height() as u32))
+        .into_styled(style)
+        .draw(&mut self.display).unwrap();
     }
 }
 
