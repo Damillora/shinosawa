@@ -1,6 +1,8 @@
 // in src/memory.rs
 
+use conquer_once::spin::OnceCell;
 use limine::memory_map::{self, EntryType};
+use spin::RwLock;
 use x86_64::{
     PhysAddr, VirtAddr,
     structures::paging::{
@@ -43,7 +45,7 @@ pub struct MemoryInfo {
     kernel_l4_table: &'static mut PageTable,
 }
 
-pub static mut MEMORY_INFO: Option<MemoryInfo> = None;
+pub static MEMORY_INFO: OnceCell<RwLock<MemoryInfo>> = OnceCell::uninit();
 
 pub unsafe fn init_page_table(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     unsafe {
@@ -60,13 +62,12 @@ pub fn init() {
         if let Some(resp) = MEMORY_MAP_REQUEST.get_response() {
             let frame_allocator = unsafe { SnLimineFrameAllocator::init(resp.entries()) };
 
-            unsafe {
-                MEMORY_INFO = Some(MemoryInfo {
-                    physical_memory_offset,
-                    frame_allocator,
-                    kernel_l4_table: active_level_4_table(physical_memory_offset),
-                })
-            };
+            MEMORY_INFO.init_once(move || RwLock::new( MemoryInfo {
+                physical_memory_offset,
+                frame_allocator,
+                kernel_l4_table: unsafe { active_level_4_table(physical_memory_offset) },
+
+            }));
         }
     } else {
         panic!("cannot get HHDM");
@@ -77,9 +78,7 @@ pub fn map_new_memory(
     start_addr: SnVirtAddr,
     end_addr: SnVirtAddr,
 ) {
-    // FIXME: Static mutable here, must there be something better
-    #[allow(static_mut_refs)]
-    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let mut memory_info = MEMORY_INFO.get().unwrap().write();
 
     let mut mapper: OffsetPageTable<'_> =
         unsafe { init_page_table(memory_info.physical_memory_offset) };
@@ -135,9 +134,8 @@ pub unsafe fn map_phys_memory(
     phys_addr_start: SnPhysAddr,
     size: usize,
 ) -> u64 {
-    // FIXME: Static mutable here, must there be something better
-    #[allow(static_mut_refs)]
-    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let mut memory_info = MEMORY_INFO.get().unwrap().write();
+
 
     let mut mapper: OffsetPageTable<'_> =
         unsafe { init_page_table(memory_info.physical_memory_offset) };
@@ -248,9 +246,8 @@ pub fn unmap_memory(
     start_addr: SnVirtAddr,
     end_addr: SnVirtAddr,
 ) {
-    // FIXME: Static mutable here, must there be something better
-    #[allow(static_mut_refs)]
-    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let memory_info = MEMORY_INFO.get().unwrap().write();
+
     let mut mapper = unsafe { init_page_table(memory_info.physical_memory_offset) };
     
     let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
