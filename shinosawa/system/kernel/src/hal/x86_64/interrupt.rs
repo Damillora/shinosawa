@@ -1,10 +1,15 @@
 use crate::{hal::x86_64::gdt, print, printk};
-use lazy_static::lazy_static;
+use conquer_once::spin::OnceCell;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
-lazy_static! {
-    static ref IDT: InterruptDescriptorTable = {
-        printk!("x86_64: initializing handlers");
+static IDT: OnceCell<InterruptDescriptorTable> = OnceCell::uninit();
+
+// TODO: this is only initialized once for now
+// Find a way to dynamically load interrupt handlers?
+#[allow(static_mut_refs)]
+pub fn init() {
+    printk!("x86_64: initializing handlers");
+    IDT.init_once(move || {
         let mut idt = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.page_fault.set_handler_fn(page_fault_handler);
@@ -15,15 +20,10 @@ lazy_static! {
         }
 
         idt
-    };
-}
+    });
 
-// TODO: this is only initialized once for now
-// Find a way to dynamically load interrupt handlers?
-#[allow(static_mut_refs)]
-pub fn init() {
     printk!("x86_64: loading interrupts");
-    IDT.load();     
+    IDT.get().unwrap().load();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
@@ -52,9 +52,7 @@ extern "x86-interrupt" fn page_fault_handler(
     panic!("page fault");
 }
 
-extern "x86-interrupt" fn timer_interrupt_handler(
-    _stack_frame: InterruptStackFrame)
-{
+extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     print!(".");
 }
 

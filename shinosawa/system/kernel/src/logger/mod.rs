@@ -50,6 +50,24 @@ pub fn _print(args: fmt::Arguments) {
     serial.write_fmt(args).unwrap();
 }
 
+pub fn _print_serial(args: fmt::Arguments) {
+    use core::fmt::Write;
+    let logger_serial = LOGGER.get().unwrap().serial.as_ref();
+
+    let mut serial = logger_serial.unwrap().lock();
+    serial.write_fmt(args).unwrap();
+}
+
+#[macro_export]
+macro_rules! print_s {
+    ($($arg:tt)*) => ($crate::logger::_print_serial(format_args!($($arg)*)));
+}
+#[macro_export]
+macro_rules! printk_s {
+    () => ($crate::print_s!("\n"));
+    ($($arg:tt)*) => ($crate::print_s!("shinosawa::system::kernel: {}\n", format_args!($($arg)*)));
+}
+
 #[macro_export]
 macro_rules! printk {
     () => ($crate::print!("\n"));

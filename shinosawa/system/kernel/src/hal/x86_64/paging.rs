@@ -16,7 +16,7 @@ use crate::{
     memory::{
         SnPhysAddr, SnVirtAddr,
     },
-    printk,
+    printk, printk_s,
 };
 
 /// Returns a mutable reference to the active level 4 table.
@@ -102,7 +102,7 @@ fn map_new_memory_inner(
     start_addr: VirtAddr,
     end_addr: VirtAddr,
 ) -> Result<(), MapToError<Size4KiB>> {
-    printk!(
+    printk_s!(
         "x86_64::paging: new_map {:x}-{:x}",
         start_addr.as_u64(),
         end_addr.as_u64()
@@ -163,7 +163,7 @@ unsafe fn map_phys_memory_inner(
     phys_addr_start: PhysAddr,
     size: usize,
 ) -> Result<u64, MapToError<Size4KiB>> {
-    printk!(
+    printk_s!(
         "x86_64::paging: phys_map {:x} size {:#} to {:x}-{:x}",
         phys_addr_start.as_u64(),
         size,
@@ -260,7 +260,7 @@ fn unmap_memory_inner(
     start_addr: VirtAddr,
     end_addr: VirtAddr,
 ) {
-    printk!(
+    printk_s!(
         "x86_64::paging: unmap {:x}-{:x}",
         start_addr.as_u64(),
         end_addr.as_u64()
