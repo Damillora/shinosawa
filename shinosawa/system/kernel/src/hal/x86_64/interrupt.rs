@@ -1,6 +1,16 @@
-use crate::{hal::x86_64::{apic::LOCAL_APIC, gdt}, print, print_s, printk};
+use core::arch::naked_asm;
+
+use crate::{
+    hal::x86_64::{apic::LOCAL_APIC, gdt},
+    printk,
+};
 use conquer_once::spin::OnceCell;
-use x86_64::{instructions::interrupts, structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode}};
+use x86_64::{
+    instructions::interrupts,
+    structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
+};
+
+use super::cpu::SnCpuContext;
 
 static IDT: OnceCell<InterruptDescriptorTable> = OnceCell::uninit();
 
@@ -36,8 +46,12 @@ pub fn init() {
                 .set_handler_fn(double_fault_handler)
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         }
-        idt[InterruptIndex::ApicTimer.as_u8()]
-            .set_handler_fn(timer_interrupt_handler); // new
+        idt[InterruptIndex::ApicTimer.as_u8()].set_handler_fn(timer_interrupt_handler_preempt);
+        unsafe {
+            idt.general_protection_fault
+                .set_handler_fn(general_protection_fault_handler)
+                .set_stack_index(gdt::GENERAL_PROTECTION_FAULT_IST_INDEX);
+        }
         idt
     });
 
@@ -45,7 +59,7 @@ pub fn init() {
     IDT.get().unwrap().load();
 
     printk!("x86_64: we will start receiving interrupts!");
-    x86_64::instructions::interrupts::enable();     // new
+    x86_64::instructions::interrupts::enable(); // new
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
@@ -74,10 +88,82 @@ extern "x86-interrupt" fn page_fault_handler(
     panic!("page fault");
 }
 
-extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    let mut lapic =LOCAL_APIC.get().unwrap().lock();
+extern "x86-interrupt" fn general_protection_fault_handler(
+    stack_frame: InterruptStackFrame,
+    _error_code: u64,
+) {
+    printk!("x86_64: general protection fault");
+
+    printk!("{:#?}", stack_frame);
+
+    panic!("general protection fault");
+}
+
+extern "C" fn timer_interrupt_handler(context: &mut SnCpuContext) {
+    let mut lapic = LOCAL_APIC.get().unwrap().lock();
     unsafe { lapic.end_of_interrupt() };
-    // lapic.end_of_interrupt();
+}
+
+#[naked]
+pub extern "x86-interrupt" fn timer_interrupt_handler_preempt(_stack_frame: InterruptStackFrame) {
+    unsafe {
+        naked_asm!(
+            // Disable interrupts
+            "cli",
+            // Push registers
+            "push rax",
+            "push rbx",
+            "push rcx",
+            "push rdx",
+
+            "push rdi",
+            "push rsi",
+            "push rbp",
+            "push r8",
+
+            "push r9",
+            "push r10",
+            "push r11",
+            "push r12",
+
+            "push r13",
+            "push r14",
+            "push r15",
+
+            // First argument in rdi with C calling convention
+            "mov rdi, rsp",
+            // Call the hander function
+            "call {handler}",
+
+            // Pop scratch registers
+            "pop r15",
+            "pop r14",
+            "pop r13",
+
+            "pop r12",
+            "pop r11",
+            "pop r10",
+            "pop r9",
+
+            "pop r8",
+            "pop rbp",
+            "pop rsi",
+            "pop rdi",
+
+            "pop rdx",
+            "pop rcx",
+            "pop rbx",
+            "pop rax",
+            // Enable interrupts
+            "sti",
+            // Interrupt return
+            "iretq",
+            // Note: Getting the handler pointer here using `sym` operand, because
+            // an `in` operand would clobber a register that we need to save, and we
+            // can't have two asm blocks
+            handler = sym timer_interrupt_handler,
+        );
+    }
 }
 
 #[test_case]

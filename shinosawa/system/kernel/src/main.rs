@@ -8,6 +8,7 @@
 
 #![feature(abi_x86_interrupt)]
 #![feature(allocator_api)]
+#![feature(naked_functions)]
 
 extern crate alloc;
 

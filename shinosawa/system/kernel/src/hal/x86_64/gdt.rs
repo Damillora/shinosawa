@@ -7,6 +7,7 @@ use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor};
 use crate::printk;
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
+pub const GENERAL_PROTECTION_FAULT_IST_INDEX: u16 = 0;
 
 static TSS: OnceCell<TaskStateSegment> = OnceCell::uninit();
 static GDT: OnceCell<(GlobalDescriptorTable, Selectors)> = OnceCell::uninit();
