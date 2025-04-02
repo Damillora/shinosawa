@@ -51,10 +51,14 @@ pub fn kernel_main() {
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");
-        use hal::interface::instruct::hcf;
 
         kernel_test_main();
+    }
 
+    {
+        use hal::interface::instruct::hcf;
+        
+        printk!("kernel's finished. everything stands still.");
         hcf();
     }
 }
