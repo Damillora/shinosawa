@@ -34,20 +34,18 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub fn kernel_main() {
     let display = fb::init().unwrap();
     let serial = unsafe { serial::init() };
-
     logger::init(display, serial);
-
     {
         printk!("shinosawa::system::kernel {}", VERSION);
         printk!("an operating system for those who find joy in things that don't go well,");
         printk!("written by someone least cut out for it.");
     }
 
-    hal::interface::cpu::init();
     hal::interface::paging::init();
     memory::alloc::init();
-
     crate::acpi::init();
+
+    hal::interface::cpu::init();
 
     #[cfg(test)]
     {
