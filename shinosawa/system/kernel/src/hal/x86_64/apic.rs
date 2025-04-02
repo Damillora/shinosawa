@@ -1,5 +1,5 @@
 use acpi::InterruptModel;
-use conquer_once::{ spin::OnceCell};
+use conquer_once::spin::OnceCell;
 use spin::Mutex;
 use x2apic::lapic::{LocalApic, LocalApicBuilder};
 use x86_64::PhysAddr;
