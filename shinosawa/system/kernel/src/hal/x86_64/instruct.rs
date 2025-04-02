@@ -2,8 +2,12 @@ use core::arch::asm;
 
 pub fn hcf() -> ! {
     loop {
-        unsafe {
-            asm!("hlt");
-        }
+        halt();
+    }
+}
+
+pub fn halt() {
+    unsafe {
+        asm!("hlt");
     }
 }
