@@ -1,7 +1,7 @@
 use core::fmt;
 
 use embedded_graphics::{
-    mono_font::{MonoFont, MonoTextStyle}, pixelcolor::Rgb888, prelude::*, primitives::{PrimitiveStyleBuilder, Rectangle}, text::Text, Drawable, Pixel
+    mono_font::{MonoFont, MonoTextStyle}, pixelcolor::Rgb888, prelude::*, primitives::{PrimitiveStyleBuilder, Rectangle}, text::Text, Drawable
 };
 
 const FONT: MonoFont<'_> = embedded_graphics::mono_font::ascii::FONT_9X18;
