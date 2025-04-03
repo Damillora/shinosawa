@@ -43,7 +43,11 @@ pub fn init() {
     IDT.init_once(move || {
         let mut idt = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
-        idt.page_fault.set_handler_fn(page_fault_handler);
+        unsafe {
+            idt.page_fault
+                .set_handler_fn(page_fault_handler)
+                .set_stack_index(gdt::PAGE_FAULT_IST_INDEX);; 
+            }
         unsafe {
             idt.double_fault
                 .set_handler_fn(double_fault_handler)
@@ -52,13 +56,14 @@ pub fn init() {
         unsafe {
             idt[InterruptIndex::ApicTimer.as_u8()]
                 .set_handler_fn(timer_interrupt_handler_preempt)
-                .set_stack_index(gdt::TIMER_IST_INDEX);;
+                .set_stack_index(gdt::TIMER_IST_INDEX);
         }
         unsafe {
             idt.general_protection_fault
                 .set_handler_fn(general_protection_fault_handler)
                 .set_stack_index(gdt::GENERAL_PROTECTION_FAULT_IST_INDEX);
         }
+
         idt
     });
 

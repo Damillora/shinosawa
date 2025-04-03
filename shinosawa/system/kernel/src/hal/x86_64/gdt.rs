@@ -8,6 +8,7 @@ use crate::hal::x86_64::interrupt::InterruptStackIndex;
 use crate::memory::SnVirtAddr;
 use crate::printk;
 
+pub const PAGE_FAULT_IST_INDEX: u16 = 0;
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 pub const GENERAL_PROTECTION_FAULT_IST_INDEX: u16 = 0;
 pub const TIMER_IST_INDEX: u16 = 1;
