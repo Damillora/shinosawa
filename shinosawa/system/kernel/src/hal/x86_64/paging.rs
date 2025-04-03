@@ -222,7 +222,7 @@ unsafe fn map_phys_memory_inner(
     };
 
     let flags =
-        PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_CACHE;
 
     let mut counter = 0;
     for page in page_range {
