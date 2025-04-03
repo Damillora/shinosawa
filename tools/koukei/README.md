@@ -1,2 +1,7 @@
-# tools:build_disk
-Builds a shinosawa disk image from rootfs and kernel builds
+# tools::koukei
+
+the scenery of shinosawa. various toolsets aiding with shinosawa development.
+
+## Commands
+- build-image: builds a shinosawa disk image
+- emulate: launches QEMU to run shinosawa
