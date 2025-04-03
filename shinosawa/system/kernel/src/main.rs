@@ -73,21 +73,10 @@ pub fn kernel_main() {
         kernel_test_main();
     }
     
-    fn forever_stand() {
-        printk!("spawning child kerne! process to forever stand. only dots remain.");
-        loop {
-            print!(".");
-            x86_64::instructions::hlt();
-        }
-    }
-
-    // Launch another kernel thread
-    crate::process::thread::new_kernel_thread(forever_stand);
-
     {
         use hal::interface::instruct::hcf;
         
-        printk!("kernel's finished. everything stands");
+        printk!("kernel init done! we'll wait here.");
         hcf();
     }
 }
