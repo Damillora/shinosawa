@@ -43,9 +43,7 @@ pub struct SnCpuContext {
 }
 
 pub unsafe fn set_context(context_addr: u64, function: u64, user_stack_end: u64, user: bool) {
-    printk!("x86_64::cpu: setting context");
     // Set context registers
-    // Add Thread to RUNNING_QUEUE
     let context = unsafe {&mut *(context_addr as *mut SnCpuContext)};
     context.rip = function as usize; // Instruction pointer
     context.rsp = user_stack_end as usize; // Stack pointer
