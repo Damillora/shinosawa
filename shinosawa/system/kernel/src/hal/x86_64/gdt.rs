@@ -10,6 +10,7 @@ use crate::printk;
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 pub const GENERAL_PROTECTION_FAULT_IST_INDEX: u16 = 0;
+pub const TIMER_IST_INDEX: u16 = 1;
 
 static TSS: OnceCell<Mutex<TaskStateSegment>> = OnceCell::uninit();
 static GDT: OnceCell<(GlobalDescriptorTable, Selectors)> = OnceCell::uninit();
@@ -47,7 +48,7 @@ pub fn init() {
             stack_end
         };
 
-        tss.interrupt_stack_table[InterruptStackIndex::Timer as usize] =
+        tss.interrupt_stack_table[TIMER_IST_INDEX as usize] =
             tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize]; // New
 
         Mutex::new(tss)

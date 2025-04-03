@@ -49,7 +49,11 @@ pub fn init() {
                 .set_handler_fn(double_fault_handler)
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
         }
-        idt[InterruptIndex::ApicTimer.as_u8()].set_handler_fn(timer_interrupt_handler_preempt);
+        unsafe {
+            idt[InterruptIndex::ApicTimer.as_u8()]
+                .set_handler_fn(timer_interrupt_handler_preempt)
+                .set_stack_index(gdt::TIMER_IST_INDEX);;
+        }
         unsafe {
             idt.general_protection_fault
                 .set_handler_fn(general_protection_fault_handler)
