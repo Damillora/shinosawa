@@ -14,24 +14,24 @@ pub fn init() {
 #[repr(packed)]
 pub struct SnCpuContext {
     // These are pushed in the handler function
-    pub r15: usize,
-    pub r14: usize,
-    pub r13: usize,
+    pub _r15: usize,
+    pub _r14: usize,
+    pub _r13: usize,
 
-    pub r12: usize,
-    pub r11: usize,
-    pub r10: usize,
-    pub r9: usize,
+    pub _r12: usize,
+    pub _r11: usize,
+    pub _r10: usize,
+    pub _r9: usize,
 
-    pub r8: usize,
-    pub rbp: usize,
-    pub rsi: usize,
-    pub rdi: usize,
+    pub _r8: usize,
+    pub _rbp: usize,
+    pub _rsi: usize,
+    pub _rdi: usize,
 
-    pub rdx: usize,
-    pub rcx: usize,
-    pub rbx: usize,
-    pub rax: usize,
+    pub _rdx: usize,
+    pub _rcx: usize,
+    pub _rbx: usize,
+    pub _rax: usize,
     // Below is the exception stack frame pushed by the CPU on interrupt
     // Note: For some interrupts (e.g. Page fault), an error code is pushed here
     rip: usize,     // Instruction pointer
