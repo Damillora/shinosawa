@@ -5,7 +5,7 @@ use x2apic::{ioapic::IoApic, lapic::{LocalApic, LocalApicBuilder}};
 use x86_64::PhysAddr;
 
 use crate::{acpi::HARDWARE_INFO, hal::x86_64::{interrupt::InterruptIndex, paging::{self, map_phys_page}}, interrupt::FREE_VECTORS_START, memory::{SnPhysAddr, SnVirtAddr}, printk};
-use core::ops::{Deref, DerefMut};
+use core::{ops::{Deref, DerefMut}};
 
 // FIXME: this is not sound
 pub struct UnsafeLocalApic(pub LocalApic);
@@ -28,7 +28,7 @@ impl DerefMut for UnsafeLocalApic {
 }
 
 pub static LOCAL_APIC: OnceCell<Mutex<UnsafeLocalApic>> = OnceCell::uninit();
-
+pub static IOAPIC: OnceCell<Mutex<IoApic>> = OnceCell::uninit();
 
 pub fn init() {
     printk!("x86_64::apic: initializing");
@@ -76,9 +76,19 @@ pub fn init() {
 
         unsafe { io_apic.init(FREE_VECTORS_START) };
         
+        unsafe { io_apic.enable_irq(1) };
+        
+        IOAPIC.init_once(move || Mutex::new(io_apic));
 
+        enable_irq(1);
     } else {
         printk!("x86_64::apic: this system does not use APIC, apparently");
     }
 
+}
+
+pub fn enable_irq(irq: u8) {
+    let mut io_apic = IOAPIC.get().unwrap().lock();
+
+    unsafe { io_apic.enable_irq(irq) };
 }

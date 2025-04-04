@@ -1,7 +1,7 @@
 use core::arch::naked_asm;
 
 use crate::{
-    hal::x86_64::{apic::LOCAL_APIC, gdt}, memory::SnVirtAddr, print, printk
+    hal::x86_64::{apic::LOCAL_APIC, gdt}, interrupt::FREE_VECTORS_START, memory::SnVirtAddr, print, printk
 };
 use conquer_once::spin::OnceCell;
 use x86_64::{
@@ -63,6 +63,7 @@ pub fn init() {
                 .set_handler_fn(general_protection_fault_handler)
                 .set_stack_index(gdt::GENERAL_PROTECTION_FAULT_IST_INDEX);
         }
+        idt[FREE_VECTORS_START + 0x01].set_handler_fn(keyboard_handler);
 
         idt
     });
@@ -109,6 +110,24 @@ extern "x86-interrupt" fn general_protection_fault_handler(
     printk!("{:#?}", stack_frame);
 
     panic!("general protection fault");
+}
+fn keyboard_handler_a() {
+
+}
+
+extern "x86-interrupt" fn keyboard_handler(
+    stack_frame: InterruptStackFrame,
+) {
+    use x86_64::instructions::port::Port;
+
+    let mut port = Port::new(0x60);
+    let scancode: u8 = unsafe { port.read() };
+    print!("{}", scancode);
+    
+    printk!("x86_64: keypress: {}", scancode);
+
+    let mut lapic = LOCAL_APIC.get().unwrap().lock();
+    unsafe { lapic.end_of_interrupt() };
 }
 
 extern "C" fn timer_interrupt_handler(context_addr: usize) -> usize{
