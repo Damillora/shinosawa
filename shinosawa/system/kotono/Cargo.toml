@@ -1,0 +1,12 @@
+[package]
+name = "shinosawa_system_kotono"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[[bin]]
+name = "kotono"
+path = "src/main.rs"
+test = false
+bench = false
