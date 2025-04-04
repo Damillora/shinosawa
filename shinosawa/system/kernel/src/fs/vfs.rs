@@ -9,12 +9,37 @@ pub type SnVfsNodeRef = Arc<dyn SnVfsNode>;
 pub enum SnVfsError {
     ReadError,
 }
+
+#[derive(Clone)]
+pub enum SnVfsType {
+    File,
+    Dir
+}
+
+#[derive(Clone)]
+pub struct SnDirEntry {
+    pub name: &'static str,
+    pub dir_type: SnVfsType,
+}
+
+impl Copy for SnVfsType
+{
+
+}
+
+impl Copy for SnDirEntry
+{
+    
+}
+
 pub trait SnVfsNode: Send + Sync {
+    fn name(&self) -> &'static str;
     fn is_file(&self) -> bool;
     fn is_dir(&self) -> bool;
     fn len(&self) -> usize;
 
     fn read(&self, buf: &mut [u8]) -> Result<usize, SnVfsError>;
+    fn read_dir(&self, entries: &mut [SnDirEntry]);
 }
 
 pub trait SnVfsFilesystem: Send + Sync {
