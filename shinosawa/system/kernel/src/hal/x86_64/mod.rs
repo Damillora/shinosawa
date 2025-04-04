@@ -12,3 +12,5 @@ pub mod paging;
 mod gdt;
 /// Intel APIC
 mod apic;
+/// Frame Allocator
+mod frame_alloc;
