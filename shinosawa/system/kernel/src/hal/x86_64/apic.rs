@@ -53,7 +53,7 @@ pub fn init() {
             )
         );
 
-        let mut lapic = lapic.lock();
+        let mut lapic = lapic.lock();;
 
         printk!("x86_64::apic: local APIC yeeee");
         unsafe {
@@ -76,11 +76,9 @@ pub fn init() {
 
         unsafe { io_apic.init(FREE_VECTORS_START) };
         
-        unsafe { io_apic.enable_irq(1) };
-        
         IOAPIC.init_once(move || Mutex::new(io_apic));
 
-        enable_irq(1);
+        // enable_irq(1);
     } else {
         printk!("x86_64::apic: this system does not use APIC, apparently");
     }

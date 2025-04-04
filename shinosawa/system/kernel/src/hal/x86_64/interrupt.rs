@@ -9,6 +9,8 @@ use x86_64::{
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
+use super::apic;
+
 
 static IDT: OnceCell<InterruptDescriptorTable> = OnceCell::uninit();
 
@@ -112,19 +114,20 @@ extern "x86-interrupt" fn general_protection_fault_handler(
     panic!("general protection fault");
 }
 fn keyboard_handler_a() {
+    
+    use x86_64::instructions::port::Port;
+
+    let mut port = Port::new(0x60);
+    let scancode: u8 = unsafe { port.read() };
+    
+    printk!("x86_64: keypress: {}", scancode);
 
 }
 
 extern "x86-interrupt" fn keyboard_handler(
     stack_frame: InterruptStackFrame,
 ) {
-    use x86_64::instructions::port::Port;
-
-    let mut port = Port::new(0x60);
-    let scancode: u8 = unsafe { port.read() };
-    print!("{}", scancode);
-    
-    printk!("x86_64: keypress: {}", scancode);
+    keyboard_handler_a();
 
     let mut lapic = LOCAL_APIC.get().unwrap().lock();
     unsafe { lapic.end_of_interrupt() };
@@ -216,6 +219,10 @@ pub extern "x86-interrupt" fn timer_interrupt_handler_preempt(_stack_frame: Inte
 
 /// Number of bytes needed to store a Context struct
 pub const INTERRUPT_CONTEXT_SIZE: usize = 20 * 8;
+
+pub fn enable_irq(irq: u8) {
+    apic::enable_irq(1);
+}
 
 #[test_case]
 fn test_breakpoint_exception() {

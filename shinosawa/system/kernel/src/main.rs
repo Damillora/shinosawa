@@ -37,6 +37,8 @@ mod acpi;
 mod process;
 /// Interrupt management
 mod interrupt;
+/// Device drivers
+mod drivers;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -73,6 +75,8 @@ pub fn init() {
 }
 
 pub fn kernel_main() {
+    crate::drivers::ps2_keyboard::init();
+    
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");
