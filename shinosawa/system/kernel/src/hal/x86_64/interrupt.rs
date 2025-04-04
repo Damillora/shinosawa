@@ -65,7 +65,7 @@ pub fn init() {
                 .set_handler_fn(general_protection_fault_handler)
                 .set_stack_index(gdt::GENERAL_PROTECTION_FAULT_IST_INDEX);
         }
-        idt[FREE_VECTORS_START + 0x01].set_handler_fn(keyboard_handler);
+        idt[FREE_VECTORS_START + 0x01].set_handler_fn(platform_handler_01);
 
         idt
     });
@@ -113,7 +113,7 @@ extern "x86-interrupt" fn general_protection_fault_handler(
 
     panic!("general protection fault");
 }
-fn keyboard_handler_a() {
+fn keyboard_handler_a(idx: u8) {
     
     use x86_64::instructions::port::Port;
 
@@ -122,15 +122,6 @@ fn keyboard_handler_a() {
     
     printk!("x86_64: keypress: {}", scancode);
 
-}
-
-extern "x86-interrupt" fn keyboard_handler(
-    stack_frame: InterruptStackFrame,
-) {
-    keyboard_handler_a();
-
-    let mut lapic = LOCAL_APIC.get().unwrap().lock();
-    unsafe { lapic.end_of_interrupt() };
 }
 
 extern "C" fn timer_interrupt_handler(context_addr: usize) -> usize{
@@ -216,6 +207,21 @@ pub extern "x86-interrupt" fn timer_interrupt_handler_preempt(_stack_frame: Inte
         );
     }
 }
+
+macro_rules! platform_handler {
+    ($name:ident, $number:literal) => {
+        extern "x86-interrupt" fn $name(
+            stack_frame: InterruptStackFrame,
+        ) {
+            keyboard_handler_a($number);
+
+            let mut lapic = LOCAL_APIC.get().unwrap().lock();
+            unsafe { lapic.end_of_interrupt() };
+        }
+    };
+}
+
+platform_handler!(platform_handler_01, 0x01);
 
 /// Number of bytes needed to store a Context struct
 pub const INTERRUPT_CONTEXT_SIZE: usize = 20 * 8;
