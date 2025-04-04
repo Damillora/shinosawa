@@ -4,7 +4,7 @@ use spin::Mutex;
 use x2apic::{ioapic::IoApic, lapic::{LocalApic, LocalApicBuilder}};
 use x86_64::PhysAddr;
 
-use crate::{acpi::HARDWARE_INFO, hal::x86_64::{interrupt::InterruptIndex, paging::{self, map_phys_page}}, memory::{SnPhysAddr, SnVirtAddr}, printk};
+use crate::{acpi::HARDWARE_INFO, hal::x86_64::{interrupt::InterruptIndex, paging::{self, map_phys_page}}, interrupt::FREE_VECTORS_START, memory::{SnPhysAddr, SnVirtAddr}, printk};
 use core::ops::{Deref, DerefMut};
 
 // FIXME: this is not sound
@@ -74,7 +74,7 @@ pub fn init() {
         map_phys_page(SnPhysAddr::new(io_apic_phys_address as u64),SnVirtAddr::new(io_apic_virt_address.as_u64()));
         let mut io_apic = unsafe { IoApic::new(io_apic_virt_address.as_u64()) };
 
-        unsafe { io_apic.init(0) };
+        unsafe { io_apic.init(FREE_VECTORS_START) };
         
 
     } else {

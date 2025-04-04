@@ -35,6 +35,8 @@ mod memory;
 mod acpi;
 /// Process management
 mod process;
+/// Interrupt management
+mod interrupt;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
