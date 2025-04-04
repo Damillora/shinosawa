@@ -15,8 +15,8 @@ impl SnLogBuffer {
         }
     }
 
-    pub fn drain(&mut self) -> impl Iterator<Item = char> {
-        self.buf.drain()
+    pub fn iter(&mut self) -> impl Iterator<Item = &char> {
+        self.buf.iter()
     }
 }
 

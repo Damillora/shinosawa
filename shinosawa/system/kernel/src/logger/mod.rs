@@ -118,15 +118,15 @@ pub fn clean_buffer() {
     if let Some(buf) = &logger.buf {
         let mut buffer = buf.lock();
 
-        buffer.drain().for_each(|c| {
+        buffer.iter().for_each(|c| {
             hal::interface::interrupt::without_interrupts(|| {
                 if let Some(logger_writer) = &logger.fb {
                     let mut writer = logger_writer.lock();
-                    writer.write_char(c).unwrap();
+                    writer.write_char(*c).unwrap();
                 }
                 if let Some(logger_serial) = &logger.serial {
                     let mut serial = logger_serial.lock();
-                    serial.write_char(c).unwrap();
+                    serial.write_char(*c).unwrap();
                 }
             });
         });
