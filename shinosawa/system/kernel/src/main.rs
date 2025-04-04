@@ -39,6 +39,8 @@ mod process;
 mod interrupt;
 /// Device drivers
 mod drivers;
+/// Filesystem
+mod fs;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -76,8 +78,15 @@ pub fn init() {
 }
 
 pub fn kernel_main() {
+    // PS/2 driver
     crate::drivers::ps2_keyboard::init();
 
+    // VFS system
+    crate::fs::vfs::init();
+    // Init dummy example filesystem
+    let example_fs = crate::fs::dummy::new_example_filesystem();
+    crate::fs::vfs::attach(example_fs);
+    
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");
