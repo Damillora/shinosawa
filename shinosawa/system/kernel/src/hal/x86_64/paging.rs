@@ -16,9 +16,9 @@ use x86_64::{
 use crate::{
     limine::MEMORY_MAP_REQUEST,
     memory::{
-        self, SnPhysAddr, SnVirtAddr
+        SnPhysAddr, SnVirtAddr
     },
-    printk, printk_s,
+    printk,
 };
 
 use super::frame_alloc::SnLimineFrameAllocator;
@@ -113,12 +113,6 @@ fn map_phys_page_inner(
     addr: PhysAddr,
     virt: VirtAddr,
 ) -> Result<(), MapToError<Size4KiB>> {
-    printk_s!(
-        "x86_64::paging: page {:x} {:x}",
-        addr.as_u64(),
-        virt.as_u64(),
-    );
-    
     let page = Page::containing_address(virt);
     let frame = PhysFrame::containing_address(addr);
 
@@ -156,11 +150,6 @@ fn map_new_memory_inner(
     start_addr: VirtAddr,
     end_addr: VirtAddr,
 ) -> Result<(), MapToError<Size4KiB>> {
-    printk_s!(
-        "x86_64::paging: new_map {:x}-{:x}",
-        start_addr.as_u64(),
-        end_addr.as_u64()
-    );
     let page_range = {
         let heap_start = start_addr.clone();
         let heap_end = end_addr.clone();
@@ -217,13 +206,6 @@ unsafe fn map_phys_memory_inner(
     phys_addr_start: PhysAddr,
     size: usize,
 ) -> Result<u64, MapToError<Size4KiB>> {
-    printk_s!(
-        "x86_64::paging: phys_map {:x} size {:#} to {:x}-{:x}",
-        phys_addr_start.as_u64(),
-        size,
-        start_addr.as_u64(),
-        end_addr.as_u64()
-    );
     let page_range = {
         let start = start_addr.clone();
         let end = end_addr.clone();
@@ -272,12 +254,6 @@ fn unmap_memory_inner(
     start_addr: VirtAddr,
     end_addr: VirtAddr,
 ) {
-    printk_s!(
-        "x86_64::paging: unmap {:x}-{:x}",
-        start_addr.as_u64(),
-        end_addr.as_u64()
-    );
-
     let page_range = {
         let start = start_addr.clone();
         let end = end_addr.clone();
