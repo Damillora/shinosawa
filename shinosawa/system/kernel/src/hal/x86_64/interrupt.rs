@@ -1,7 +1,7 @@
 use core::arch::naked_asm;
 
 use crate::{
-    hal::x86_64::{apic::LOCAL_APIC, gdt}, interrupt::FREE_VECTORS_START, memory::SnVirtAddr, print, printk
+    hal::x86_64::{apic::LOCAL_APIC, gdt}, interrupt::{FREE_VECTORS_START, INTERRUPT_CONTROLLER}, memory::SnVirtAddr, print, printk
 };
 use conquer_once::spin::OnceCell;
 use x86_64::{
@@ -66,6 +66,36 @@ pub fn init() {
                 .set_stack_index(gdt::GENERAL_PROTECTION_FAULT_IST_INDEX);
         }
         idt[FREE_VECTORS_START + 0x01].set_handler_fn(platform_handler_01);
+        idt[FREE_VECTORS_START + 0x02].set_handler_fn(platform_handler_02);
+        idt[FREE_VECTORS_START + 0x03].set_handler_fn(platform_handler_03);
+        idt[FREE_VECTORS_START + 0x04].set_handler_fn(platform_handler_04);
+        idt[FREE_VECTORS_START + 0x05].set_handler_fn(platform_handler_05);
+        idt[FREE_VECTORS_START + 0x06].set_handler_fn(platform_handler_06);
+        idt[FREE_VECTORS_START + 0x07].set_handler_fn(platform_handler_07);
+        idt[FREE_VECTORS_START + 0x08].set_handler_fn(platform_handler_08);
+        idt[FREE_VECTORS_START + 0x09].set_handler_fn(platform_handler_09);
+        idt[FREE_VECTORS_START + 0x0a].set_handler_fn(platform_handler_0a);
+        idt[FREE_VECTORS_START + 0x0b].set_handler_fn(platform_handler_0b);
+        idt[FREE_VECTORS_START + 0x0c].set_handler_fn(platform_handler_0c);
+        idt[FREE_VECTORS_START + 0x0d].set_handler_fn(platform_handler_0d);
+        idt[FREE_VECTORS_START + 0x0e].set_handler_fn(platform_handler_0e);
+        idt[FREE_VECTORS_START + 0x0f].set_handler_fn(platform_handler_0f);
+        idt[FREE_VECTORS_START + 0x10].set_handler_fn(platform_handler_10);
+        idt[FREE_VECTORS_START + 0x11].set_handler_fn(platform_handler_11);
+        idt[FREE_VECTORS_START + 0x12].set_handler_fn(platform_handler_12);
+        idt[FREE_VECTORS_START + 0x13].set_handler_fn(platform_handler_13);
+        idt[FREE_VECTORS_START + 0x14].set_handler_fn(platform_handler_14);
+        idt[FREE_VECTORS_START + 0x15].set_handler_fn(platform_handler_15);
+        idt[FREE_VECTORS_START + 0x16].set_handler_fn(platform_handler_16);
+        idt[FREE_VECTORS_START + 0x17].set_handler_fn(platform_handler_17);
+        idt[FREE_VECTORS_START + 0x18].set_handler_fn(platform_handler_18);
+        idt[FREE_VECTORS_START + 0x19].set_handler_fn(platform_handler_19);
+        idt[FREE_VECTORS_START + 0x1a].set_handler_fn(platform_handler_1a);
+        idt[FREE_VECTORS_START + 0x1b].set_handler_fn(platform_handler_1b);
+        idt[FREE_VECTORS_START + 0x1c].set_handler_fn(platform_handler_1c);
+        idt[FREE_VECTORS_START + 0x1d].set_handler_fn(platform_handler_1d);
+        idt[FREE_VECTORS_START + 0x1e].set_handler_fn(platform_handler_1e);
+        idt[FREE_VECTORS_START + 0x1f].set_handler_fn(platform_handler_1f);
 
         idt
     });
@@ -113,15 +143,11 @@ extern "x86-interrupt" fn general_protection_fault_handler(
 
     panic!("general protection fault");
 }
-fn keyboard_handler_a(idx: u8) {
-    
-    use x86_64::instructions::port::Port;
 
-    let mut port = Port::new(0x60);
-    let scancode: u8 = unsafe { port.read() };
-    
-    printk!("x86_64: keypress: {}", scancode);
+fn platform_handler(idx: u8) {
+    let interrupt_controller = INTERRUPT_CONTROLLER.get().unwrap().read();
 
+    interrupt_controller.run_handler(idx as usize);
 }
 
 extern "C" fn timer_interrupt_handler(context_addr: usize) -> usize{
@@ -213,7 +239,7 @@ macro_rules! platform_handler {
         extern "x86-interrupt" fn $name(
             stack_frame: InterruptStackFrame,
         ) {
-            keyboard_handler_a($number);
+            platform_handler($number);
 
             let mut lapic = LOCAL_APIC.get().unwrap().lock();
             unsafe { lapic.end_of_interrupt() };
@@ -221,7 +247,39 @@ macro_rules! platform_handler {
     };
 }
 
+platform_handler!(platform_handler_00, 0x00);
 platform_handler!(platform_handler_01, 0x01);
+platform_handler!(platform_handler_02, 0x02);
+platform_handler!(platform_handler_03, 0x03);
+platform_handler!(platform_handler_04, 0x04);
+platform_handler!(platform_handler_05, 0x05);
+platform_handler!(platform_handler_06, 0x06);
+platform_handler!(platform_handler_07, 0x07);
+platform_handler!(platform_handler_08, 0x08);
+platform_handler!(platform_handler_09, 0x09);
+platform_handler!(platform_handler_0a, 0x0a);
+platform_handler!(platform_handler_0b, 0x0b);
+platform_handler!(platform_handler_0c, 0x0c);
+platform_handler!(platform_handler_0d, 0x0d);
+platform_handler!(platform_handler_0e, 0x0e);
+platform_handler!(platform_handler_0f, 0x0f);
+platform_handler!(platform_handler_10, 0x10);
+platform_handler!(platform_handler_11, 0x11);
+platform_handler!(platform_handler_12, 0x12);
+platform_handler!(platform_handler_13, 0x13);
+platform_handler!(platform_handler_14, 0x14);
+platform_handler!(platform_handler_15, 0x15);
+platform_handler!(platform_handler_16, 0x16);
+platform_handler!(platform_handler_17, 0x17);
+platform_handler!(platform_handler_18, 0x18);
+platform_handler!(platform_handler_19, 0x19);
+platform_handler!(platform_handler_1a, 0x1a);
+platform_handler!(platform_handler_1b, 0x1b);
+platform_handler!(platform_handler_1c, 0x1c);
+platform_handler!(platform_handler_1d, 0x1d);
+platform_handler!(platform_handler_1e, 0x1e);
+platform_handler!(platform_handler_1f, 0x1f);
+
 
 /// Number of bytes needed to store a Context struct
 pub const INTERRUPT_CONTEXT_SIZE: usize = 20 * 8;
