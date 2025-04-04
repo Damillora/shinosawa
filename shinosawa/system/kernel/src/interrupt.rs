@@ -19,6 +19,16 @@ impl InterruptController {
             handlers: [const { None }; FREE_VECTORS],
         }
     }
+
+    pub fn set_handler(&mut self, idx: usize,  handler: fn()) {
+        self.handlers[idx] = Some(InterruptHandler { handler: handler });
+    }
+
+    pub fn run_handler(&self, idx: usize) {
+        if let Some(handler) = &self.handlers[idx] {
+            (handler.handler)();
+        }
+    }
 }
 
 pub static INTERRUPT_CONTROLLER: OnceCell<RwLock<InterruptController>> = OnceCell::uninit();

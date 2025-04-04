@@ -65,6 +65,7 @@ pub fn init() {
     crate::acpi::init();
 
     crate::hal::interface::cpu::init();
+    crate::interrupt::init();
 
     crate::process::thread::init();
 
@@ -76,7 +77,7 @@ pub fn init() {
 
 pub fn kernel_main() {
     crate::drivers::ps2_keyboard::init();
-    
+
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");
