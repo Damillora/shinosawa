@@ -59,7 +59,6 @@ pub unsafe fn init_page_table(physical_memory_offset: VirtAddr) -> OffsetPageTab
 }
 
 pub fn init() {
-    printk!("x86_64: initializing paging infrastructure");
     if let Some(res) = crate::limine::HHDM_REQUEST.get_response() {
         let physical_memory_offset = VirtAddr::new(res.offset()); // Store boot_info for later calls
 

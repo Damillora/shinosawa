@@ -11,6 +11,7 @@
 #![feature(naked_functions)]
 
 use hal::x86_64::instruct::hcf;
+use logger::{clean_buffer, logbuf::SnLogBuffer};
 
 extern crate alloc;
 
@@ -39,20 +40,24 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn init() {
     logger::init();
-    
-    let serial = unsafe { serial::init() };
-    logger::set_serial(serial);
+    crate::hal::interface::paging::init();
+    crate::memory::alloc::init();
 
-    let display = fb::init().unwrap();
-    logger::set_fb(display);
+    let buffer = SnLogBuffer::new();
+    logger::set_buffer(buffer);
 
     {
         printk!("shinosawa::system::kernel {}", VERSION);
         printk!("an operating system for those who find joy in things that don't go well,");
         printk!("written by someone least cut out for it.");
     }
-    crate::hal::interface::paging::init();
-    crate::memory::alloc::init();
+
+    let serial = unsafe { serial::init() };
+    logger::set_serial(serial);
+    let display = fb::init().unwrap();
+    logger::set_fb(display);
+    clean_buffer();
+    
     crate::acpi::init();
 
     crate::hal::interface::cpu::init();
