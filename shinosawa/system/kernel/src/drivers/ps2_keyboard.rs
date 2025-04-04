@@ -26,6 +26,7 @@ fn keyboard_handler() {
 }
 
 pub fn init() {
+    printk!("drivers::ps2_keyboard: initialize PS/2 keyboard controller");
     KEYBOARD.init_once(move || {
         Mutex::new(Keyboard::new(ScancodeSet1::new(),
             layouts::Us104Key, HandleControl::Ignore)
