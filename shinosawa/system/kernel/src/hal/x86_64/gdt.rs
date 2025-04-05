@@ -59,6 +59,7 @@ pub fn init() {
     printk!("x86_64: initializing GDT");
     GDT.init_once(move || {
         let mut gdt = GlobalDescriptorTable::new();
+        // The GDT has to be in this exact order to support syscalls using syscall and sysret
         let code_selector = gdt.append(Descriptor::kernel_code_segment());
         let data_selector = gdt.append(Descriptor::kernel_data_segment());
         let tss_selector = gdt.append(Descriptor::tss_segment(unsafe { tss_reference() }));
