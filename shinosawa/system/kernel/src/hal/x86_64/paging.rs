@@ -257,7 +257,6 @@ pub fn map_user_memory(
     start_addr: SnVirtAddr,
     end_addr: SnVirtAddr,
 ) {
-    printk!("{:x} {:x}", start_addr.as_u64(), end_addr.as_u64());
     let mut memory_info = MEMORY_INFO.get().unwrap().write();
 
     let mut mapper: OffsetPageTable<'_> =
