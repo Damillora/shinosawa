@@ -41,7 +41,11 @@ pub struct SnCpuContext {
     pub ss: usize,      // Stack segment
     // Here the CPU may push values to align the stack on a 16-byte boundary (for SSE)
 }
-
+impl SnCpuContext {
+    pub fn instruction_pointer(&self) -> usize {
+        self.rip
+    }
+}
 pub unsafe fn set_context(context_addr: u64, function: u64, user_stack_end: u64, user: bool) {
     // Set context registers
     let context = unsafe {&mut *(context_addr as *mut SnCpuContext)};
