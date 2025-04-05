@@ -1,9 +1,9 @@
-use alloc::{boxed::Box, collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use spin::RwLock;
 
 use crate::printk;
 
-use super::vfs::{split_path, SnDirEntry, SnVfsError, SnVfsFilesystem, SnVfsNode, SnVfsNodeRef, SnVfsType};
+use super::vfs::{split_path, SnDirEntry, SnVfsError, SnVfsFilesystem, SnVfsNode, SnVfsNodeRef, SnVfsResult, SnVfsType};
 
 struct SnDummyNode {
     pub name: &'static str,
@@ -55,7 +55,7 @@ impl SnVfsNode for SnDummyNode {
         if let Some(dir) = &self.children {
             let dirs = dir.read();
 
-            for (name, entry) in dirs.iter()  {
+            for (_, entry) in dirs.iter()  {
                 match &entry.node_type() {
                     SnVfsType::File => ent.push(SnDirEntry {
                         name: entry.name(),
@@ -76,7 +76,7 @@ impl SnVfsNode for SnDummyNode {
         self.node_type
     }
     
-    fn find(self: Arc<Self>, path: &str) -> Result<SnVfsNodeRef, SnVfsError> {
+    fn find(self: Arc<Self>, path: &str) -> SnVfsResult {
         let (name, sub) = split_path(path);
 
         let node = match name {

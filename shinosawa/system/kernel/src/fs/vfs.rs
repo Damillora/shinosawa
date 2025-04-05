@@ -1,10 +1,11 @@
-use alloc::{boxed::Box, collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, sync::Arc};
 use conquer_once::spin::OnceCell;
 use spin::RwLock;
 
 use crate::printk;
 
 pub type SnVfsNodeRef = Arc<dyn SnVfsNode>;
+
 pub type SnVfsResult = Result<super::vfs::SnVfsNodeRef, SnVfsError> ;
 
 #[derive(Debug)]
@@ -46,7 +47,7 @@ pub trait SnVfsNode: Send + Sync {
     fn read(&self, buf: &mut [u8]) -> Result<usize, SnVfsError>;
     fn read_dir(&self, entries: &mut [SnDirEntry]);
 
-    fn find(self: Arc<Self>, path: &str) -> Result<SnVfsNodeRef, SnVfsError>;
+    fn find(self: Arc<Self>, path: &str) -> SnVfsResult;
 }
 
 pub trait SnVfsFilesystem: Send + Sync {
