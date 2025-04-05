@@ -1,4 +1,4 @@
-use crate::{printk, process::thread};
+use crate::{printk, process::thread, syscall::SYSCALL_CONTROLLER};
 use core::arch::{asm, naked_asm};
 
 const MSR_STAR: usize = 0xc0000081;
@@ -10,7 +10,8 @@ extern "C" fn dispatch_syscall(
     syscall_id: u64,
     arg1: u64, arg2: u64, arg3: u64
 ) {
-    printk!("x86_64::syscall: write");
+    let syscall_controller = SYSCALL_CONTROLLER.get().unwrap().read();
+    syscall_controller.run_handler(syscall_id, arg1, arg2, arg3);
 }
 
 #[naked]

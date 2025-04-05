@@ -10,6 +10,7 @@
 #![feature(allocator_api)]
 #![feature(naked_functions)]
 
+use alloc::vec::Vec;
 use hal::x86_64::instruct::hcf;
 use logger::{clean_buffer, logbuf::SnLogBuffer};
 
@@ -37,6 +38,8 @@ mod acpi;
 mod process;
 /// Interrupt management
 mod interrupt;
+/// Syscall controller
+mod syscall;
 /// Device drivers
 mod drivers;
 /// Filesystem
@@ -91,19 +94,19 @@ pub fn kernel_main() {
 
     let file = crate::fs::vfs::find("SNSW:/shinosawa/system/kotono").unwrap();
     let len = file.len();
-    let mut buf = [0u8; 10000];
+    let mut buf = [0; 10000];
 
     file.read(&mut buf).unwrap();
 
-    
-    let entry_point = crate::loader::elf::load_elf(&buf).unwrap();
+    let kotono = crate::loader::elf::load_elf(&buf).unwrap();
 
-    // Initialize syscalls
+    // Initialize syscall for CPU
     crate::hal::interface::syscall::init();
+    // Initialize syscall controller
+    crate::syscall::init();
 
     // We can *actually* start a user process now.
-    crate::process::thread::new_user_thread(entry_point);
-
+    crate::process::thread::new_user_thread(kotono);
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");
