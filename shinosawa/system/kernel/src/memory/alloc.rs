@@ -8,7 +8,7 @@ use super::{linked_list::LinkedListAllocator, Locked, SnVirtAddr};
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 10 * 1024 * 1024; // 10 KiB
 
-pub const ACPI_START: usize = 0x_3333_0000_0000;
+pub const ACPI_START: usize = 0x_4444_0000_0000;
 
 #[global_allocator]
 static ALLOCATOR: Locked<LinkedListAllocator> =
