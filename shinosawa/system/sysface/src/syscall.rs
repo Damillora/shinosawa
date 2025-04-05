@@ -13,8 +13,9 @@ pub struct SyscallError(u64);
 
 pub fn write(str: &str)  {
     unsafe {
-        asm!("mov rax, 1", // syscall function
+        asm!( // syscall function
              "syscall",
+             in("rax") Syscall::Write as u64,
              in("rdi") str.as_ptr(), // First argument
              in("rsi") str.len()); // Second argument
     }
