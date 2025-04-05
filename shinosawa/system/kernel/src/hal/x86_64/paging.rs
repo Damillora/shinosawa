@@ -37,6 +37,14 @@ pub unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static
     unsafe { get_page_table_from_address(physical_memory_offset, phys.as_u64()) }
 }
 
+pub fn get_current_page_table_phys_addr() -> u64 {
+    use x86_64::registers::control::Cr3;
+
+    let (level_4_table_frame, _) = Cr3::read();
+
+    level_4_table_frame.start_address().as_u64()
+}
+
 pub unsafe fn get_page_table_from_address(
     physical_memory_offset: VirtAddr,
     phys_address: u64,
@@ -178,7 +186,6 @@ pub fn with_page_table<T: FnOnce()>(page_table_phys_addr: SnPhysAddr, func: T) {
 
     let phys = level_4_table_frame.start_address();
 
-    printk!("switch to page table: {:x}", page_table_phys_addr.as_u64());
     switch_page_table(page_table_phys_addr);
 
     func();
@@ -346,7 +353,6 @@ pub fn map_user_memory(start_addr: SnVirtAddr, end_addr: SnVirtAddr) {
     let physical_memory_offset = memory_info.physical_memory_offset;
 
     let mut mapper: OffsetPageTable<'_> = unsafe { init_page_table(physical_memory_offset) };
-
     let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
     let end_addr_x86 = VirtAddr::new(end_addr.as_u64());
 
