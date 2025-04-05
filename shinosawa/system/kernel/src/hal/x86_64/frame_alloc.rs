@@ -140,13 +140,17 @@ impl SnLimineFrameAllocator {
             .offset(l3_index as isize * 64 +l2_index as isize)};
         unsafe{*l1_ptr |= 1 << l1_index;}
 
-        // set level 2 bit
-        let l2_ptr = self.level_2_virt_addr.as_mut_ptr() as *mut u64;
-        unsafe{*l2_ptr |= 1 << l2_index};
+        if(unsafe { *l1_ptr } == 0) {
+            // set level 2 bit
+            let l2_ptr = self.level_2_virt_addr.as_mut_ptr() as *mut u64;
+            unsafe{*l2_ptr |= 1 << l2_index};
 
-        // set level 2 bit
-        let l3_ptr = self.level_2_virt_addr.as_mut_ptr() as *mut u64;
-        unsafe{*l2_ptr |= 1 << l3_index};
+            if(unsafe { *l2_ptr} == 0) {
+                // set level 3 bit
+                let l3_ptr = self.level_3_virt_addr.as_mut_ptr() as *mut u64;
+                unsafe{*l3_ptr |= 1 << l3_index};
+            }
+        }
     }
 
     fn deallocate_frame(&mut self, frame: PhysFrame) {
