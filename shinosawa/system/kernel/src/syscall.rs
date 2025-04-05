@@ -44,7 +44,6 @@ pub fn init() {
     controller.set_handler(1, write);
 }
 
-
 fn write(ptr: u64, len: u64, arg3: u64) {
     // Check all inputs: Does ptr -> ptr+len lie entirely in user address space?
     if len == 0 {
