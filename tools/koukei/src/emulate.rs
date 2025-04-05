@@ -18,7 +18,7 @@ pub fn command(image: String) {
         .envs(env::vars())
         .args([
             "-M",
-            "q35,accel=tcg",
+            "q35,accel=kvm",
             "-cpu","IvyBridge,+x2apic",
             "-drive",
             "if=pflash,unit=0,format=raw,file=ovmf/OVMF_CODE.4m.fd,readonly=on",
