@@ -19,3 +19,5 @@ the beating heart of the shinosawa operating system.
 - X2APIC interrupt controller support using the [x2apic](https://crates;io/crates/x2apic) crate.
 - Basic linked list allocator.
 - Basic thread scheduling.
+- PS/2 keyboard driver.
+- Basic userspace.

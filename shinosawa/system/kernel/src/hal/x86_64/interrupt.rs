@@ -65,8 +65,8 @@ pub fn init() {
                 .set_handler_fn(general_protection_fault_handler)
                 .set_stack_index(gdt::GENERAL_PROTECTION_FAULT_IST_INDEX);
         }
-        idt[FREE_VECTORS_START + 0x01].set_handler_fn(platform_handler_01);
-        idt[FREE_VECTORS_START + 0x02].set_handler_fn(platform_handler_02);
+        unsafe { idt[FREE_VECTORS_START + 0x01].set_handler_fn(platform_handler_01).set_stack_index(gdt::PLATFORM_HANDLER_IST_INDEX) };
+        unsafe { idt[FREE_VECTORS_START + 0x02].set_handler_fn(platform_handler_02).set_stack_index(gdt::PLATFORM_HANDLER_IST_INDEX) };
         idt[FREE_VECTORS_START + 0x03].set_handler_fn(platform_handler_03);
         idt[FREE_VECTORS_START + 0x04].set_handler_fn(platform_handler_04);
         idt[FREE_VECTORS_START + 0x05].set_handler_fn(platform_handler_05);

@@ -41,6 +41,8 @@ mod interrupt;
 mod drivers;
 /// Filesystem
 mod fs;
+/// Executable loaders
+mod loader;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -85,8 +87,19 @@ pub fn kernel_main() {
     crate::fs::vfs::init();
     // Init dummy example filesystem
     let example_fs = crate::fs::dummy::new_example_filesystem();
-    crate::fs::vfs::attach(example_fs);
+    crate::fs::vfs::attach("SNSW:", example_fs);
+
+    let file = crate::fs::vfs::find("SNSW:/shinosawa/system/kotono").unwrap();
+    let len = file.len();
+    let mut buf = [0u8; 10000];
+
+    file.read(&mut buf).unwrap();
+
+    let entry_point = crate::loader::elf::load_elf(&buf).unwrap();
     
+    // We can *actually* start a user process now.
+    crate::process::thread::new_user_thread(entry_point);
+
     #[cfg(test)]
     {
         printk!("tests has been enabled. running them now.");

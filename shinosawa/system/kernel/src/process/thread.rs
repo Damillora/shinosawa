@@ -50,8 +50,8 @@ pub fn new_kernel_thread(function: fn()->()) {
     });
 }
 
-pub fn new_user_thread(function: fn()->()) {
-    printk!("process: spawning new user thread {:x}", function as u64);
+pub fn new_user_thread(entry_point: SnVirtAddr) {
+    printk!("process: spawning new user thread {:x}", entry_point.as_u64());
     let new_thread = {
         let kernel_stack = Vec::with_capacity(KERNEL_STACK_SIZE as usize);
         let kernel_stack_end = (SnVirtAddr::from_ptr(kernel_stack.as_ptr())
@@ -69,7 +69,7 @@ pub fn new_user_thread(function: fn()->()) {
             context})
     };
 
-    unsafe { crate::hal::interface::cpu::set_context(new_thread.context, function as u64, new_thread.user_stack_end, true)};
+    unsafe { crate::hal::interface::cpu::set_context(new_thread.context, entry_point.as_u64(), new_thread.user_stack_end, true)};
 
     crate::hal::interface::interrupt::without_interrupts(|| {
         RUNNING_QUEUE.get().unwrap().write().push_back(new_thread);

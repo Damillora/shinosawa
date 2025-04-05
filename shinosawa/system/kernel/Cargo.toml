@@ -3,6 +3,7 @@
 name = "shinosawa_system_kernel"
 version = "0.1.0"
 edition = "2024"
+default-run = "kernel"
 
 [[bin]]
 name = "kernel"
@@ -20,6 +21,7 @@ acpi = { version = "5.2.0", features = ["alloc"] }
 x2apic = "0.5.0"
 ringbuffer = { version = "0.15.0", features = ["alloc"] }
 pc-keyboard = "0.8.0"
+object = { version = "0.36.7", default-features = false, features = ["read"] }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.15.2"

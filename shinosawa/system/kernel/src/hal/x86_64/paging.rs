@@ -69,7 +69,6 @@ pub fn init() {
                 physical_memory_offset,
                 frame_allocator,
                 kernel_l4_table: unsafe { active_level_4_table(physical_memory_offset) },
-
             }));
         }
     } else {
@@ -83,6 +82,24 @@ pub fn phys_to_virt_addr(phys: PhysAddr) -> VirtAddr {
     return memory_info.physical_memory_offset + phys.as_u64();
 }
 
+fn create_empty_pagetable() -> (*mut PageTable, u64) {
+    // Need to borrow as mutable so that we can allocate new frames
+    // and so modify the frame allocator
+    let mut memory_info = unsafe {MEMORY_INFO.get().unwrap().write()};
+
+    // Get a frame to store the level 4 table
+    let level_4_table_frame = memory_info.frame_allocator.allocate_frame().unwrap();
+    let phys = level_4_table_frame.start_address(); // Physical address
+    let virt = memory_info.physical_memory_offset + phys.as_u64(); // Kernel virtual address
+    let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
+
+    // Clear all entries in the page table
+    unsafe {
+        (*page_table_ptr).zero();
+    }
+
+    (page_table_ptr, phys.as_u64())
+}
 
 /// Map a single phys page
 pub fn map_phys_page(
@@ -235,6 +252,55 @@ unsafe fn map_phys_memory_inner(
     Ok(counter)
 }
 
+/// Maps user accessible memory
+pub fn map_user_memory(
+    start_addr: SnVirtAddr,
+    end_addr: SnVirtAddr,
+) {
+    printk!("{:x} {:x}", start_addr.as_u64(), end_addr.as_u64());
+    let mut memory_info = MEMORY_INFO.get().unwrap().write();
+
+    let mut mapper: OffsetPageTable<'_> =
+        unsafe { init_page_table(memory_info.physical_memory_offset) };
+
+    let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
+    let end_addr_x86 = VirtAddr::new(end_addr.as_u64());
+
+    map_user_memory_inner(
+        &mut mapper,
+        &mut memory_info.frame_allocator,
+        start_addr_x86,
+        end_addr_x86,
+    )
+    .expect("cannot map memory")
+}
+
+/// Create heap
+fn map_user_memory_inner(
+    mapper: &mut impl Mapper<Size4KiB>,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+    start_addr: VirtAddr,
+    end_addr: VirtAddr,
+) -> Result<(), MapToError<Size4KiB>> {
+    let page_range = {
+        let heap_start = start_addr.clone();
+        let heap_end = end_addr.clone();
+        let heap_start_page = Page::containing_address(heap_start);
+        let heap_end_page = Page::containing_address(heap_end);
+        Page::range_inclusive(heap_start_page, heap_end_page)
+    };
+
+    for page in page_range {
+        let frame = frame_allocator
+            .allocate_frame()
+            .ok_or(MapToError::FrameAllocationFailed)?;
+        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
+        unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
+    }
+
+    Ok(())
+}
+
 pub fn unmap_memory(
     start_addr: SnVirtAddr,
     end_addr: SnVirtAddr,
@@ -264,5 +330,4 @@ fn unmap_memory_inner(
     for page in page_range {
         mapper.unmap(page).expect("cannot unmap").1.flush();
     }
-
 }
