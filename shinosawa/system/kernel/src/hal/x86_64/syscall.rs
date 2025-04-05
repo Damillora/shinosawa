@@ -1,9 +1,12 @@
-use crate::{printk, process::thread, syscall::SYSCALL_CONTROLLER};
+use crate::{hal::x86_64::gdt, printk, process::thread, syscall::SYSCALL_CONTROLLER};
 use core::arch::{asm, naked_asm};
 
 const MSR_STAR: usize = 0xc0000081;
 const MSR_LSTAR: usize = 0xc0000082;
 const MSR_FMASK: usize = 0xc0000084;
+const MSR_KERNEL_GS_BASE: usize = 0xC0000102;
+
+const SYSCALL_KERNEL_STACK_OFFSET: u64 = 512 * 2;
 
 extern "C" fn dispatch_syscall(
     context_addr: u64,
@@ -19,6 +22,16 @@ extern "C" fn handle_syscall() {
     // Empty for now
     unsafe {
         naked_asm!(
+            // swap value in kernel and user GS base register
+            "swapgs",
+            "mov gs:{tss_syscall}, rsp", // save user RSP
+            "mov rsp, gs:{tss_timer}", // load kernel RSP
+            // Move stack pointer by two pages
+            "sub rsp, {ks_offset}",
+            
+            "sub rsp, 8", // To be replaced with SS
+            "push gs:{tss_syscall}", // user RSP
+            "swapgs",
             // Here should switch stack to avoid messing with user stack
             "push r11", // Caller's RFLAGS
             "sub rsp, 8",  // CS
@@ -62,6 +75,9 @@ extern "C" fn handle_syscall() {
             sys_write = sym dispatch_syscall,
             user_code_start = const(thread::USER_CODE_START),
             user_code_end = const(thread::USER_CODE_END),
+            tss_timer = const(0x24 + gdt::TIMER_IST_INDEX * 8),
+            tss_syscall = const(0x24 + gdt::SYSCALL_IST_INDEX * 8),
+            ks_offset = const(SYSCALL_KERNEL_STACK_OFFSET),
         );
     }
 }
@@ -86,6 +102,17 @@ pub fn init() {
             "wrmsr",
             in("rax") handler_addr,
             in("rcx") MSR_LSTAR);
+        // Set KERNEL_GS_BASE to TSS address
+        asm!(
+            // Want to move RDX into MSR but wrmsr takes EDX:EAX i.e. EDX
+            // goes to high 32 bits of MSR, and EAX goes to low order bits
+            // https://www.felixcloutier.com/x86/wrmsr
+            "mov eax, edx",
+            "shr rdx, 32", // Shift high bits into EDX
+            "wrmsr",
+            in("rcx") MSR_KERNEL_GS_BASE,
+            in("rdx") gdt::tss_address()
+        );
         // Set segment selectors when syscall ops are executed
         asm!(
             "xor rax, rax",

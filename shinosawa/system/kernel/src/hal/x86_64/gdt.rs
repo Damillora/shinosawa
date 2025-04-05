@@ -13,6 +13,7 @@ pub const GENERAL_PROTECTION_FAULT_IST_INDEX: u16 = 0;
 pub const TIMER_IST_INDEX: u16 = 1;
 pub const PAGE_FAULT_IST_INDEX: u16 = 0;
 pub const PLATFORM_HANDLER_IST_INDEX: u16 = 0;
+pub const SYSCALL_IST_INDEX: u16 = 2;
 
 static TSS: OnceCell<Mutex<TaskStateSegment>> = OnceCell::uninit();
 static GDT: OnceCell<(GlobalDescriptorTable, Selectors)> = OnceCell::uninit();
@@ -20,6 +21,11 @@ static GDT: OnceCell<(GlobalDescriptorTable, Selectors)> = OnceCell::uninit();
 unsafe fn tss_reference() -> &'static TaskStateSegment {
     let tss_ptr = &*TSS.get().unwrap().lock() as *const TaskStateSegment;
     unsafe { &*tss_ptr }
+}
+
+pub fn tss_address() -> u64 {
+    let tss_ptr = &*TSS.get().unwrap().lock() as *const TaskStateSegment;
+    tss_ptr as u64
 }
 
 pub fn set_interrupt_stack_table(index: usize, stack_end: SnVirtAddr) {
