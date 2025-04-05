@@ -10,14 +10,12 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "sysv64" fn _start() -> ! {
-    for f in 0..100 {
-        unsafe {
-            asm!(
-                "mov rdi, 1", // write
-                "syscall"
-            );
-        }
-        
+    let s = "hello";
+    unsafe {
+        asm!("mov rax, 1", // syscall function
+             "syscall",
+             in("rdi") s.as_ptr(), // First argument
+             in("rsi") s.len()); // Second argument
     }
     loop {}
 }

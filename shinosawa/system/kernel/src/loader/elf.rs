@@ -8,6 +8,7 @@ use crate::{
 
 use super::SnExecutable;
 
+#[derive(Clone)]
 pub struct SnElfExecutable {
     entry_point: SnVirtAddr,
     user_page_table_virt_addr: SnVirtAddr,

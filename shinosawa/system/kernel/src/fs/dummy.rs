@@ -1,3 +1,5 @@
+use core::cmp;
+
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use spin::RwLock;
 
@@ -26,12 +28,22 @@ impl SnVfsNode for SnDummyNode {
         }
     }
 
-    fn read(&self, buf: &mut [u8]) -> Result<usize, SnVfsError> {
-        if let Some(content) = &self.contents {
-            let file = content;
-            buf[0..file.len()].copy_from_slice(&file);
+    fn read(&self, buf: &mut [u8]) -> Result<usize, SnVfsError> { 
+        if let Some(mut content) = self.contents {
+            let amt = cmp::min(buf.len(), self.len());
 
-            return Ok(file.len());
+            let (a, b) = content.split_at(amt);
+
+            // First check if the amount of bytes we want to read is small:
+            // `copy_from_slice` will generally expand to a call to `memcpy`, and
+            // for a single byte the overhead is significant.
+            if amt == 1 {
+                buf[0] = a[0];
+            } else {
+                buf[..amt].copy_from_slice(a);
+            }
+            
+            return Ok(amt);
         }
 
         Err(SnVfsError::ReadError)
