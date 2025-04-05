@@ -92,6 +92,11 @@ pub fn kernel_main() {
     let example_fs = crate::fs::dummy::new_example_filesystem();
     crate::fs::vfs::attach("SNSW:", example_fs);
 
+    // Initialize syscall for CPU
+    crate::hal::interface::syscall::init();
+    // Initialize syscall controller
+    crate::syscall::init();
+
     let file = crate::fs::vfs::find("SNSW:/shinosawa/system/kotono").unwrap();
     let len = file.len();
     let mut buf = [0; 10000];
@@ -99,11 +104,6 @@ pub fn kernel_main() {
     file.read(&mut buf).unwrap();
 
     let kotono = crate::loader::elf::load_elf(&buf).unwrap();
-
-    // Initialize syscall for CPU
-    crate::hal::interface::syscall::init();
-    // Initialize syscall controller
-    crate::syscall::init();
 
     // We can *actually* start a user process now.
     crate::process::thread::new_user_thread(kotono);
