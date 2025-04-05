@@ -13,7 +13,7 @@ pub unsafe extern "sysv64" fn _start() -> ! {
     for f in 0..100 {
         unsafe {
             asm!(
-                // "mov rdi, 1", // write
+                "mov rdi, 1", // write
                 "syscall"
             );
         }

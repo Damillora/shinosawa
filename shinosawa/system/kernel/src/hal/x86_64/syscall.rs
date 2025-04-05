@@ -5,7 +5,11 @@ const MSR_STAR: usize = 0xc0000081;
 const MSR_LSTAR: usize = 0xc0000082;
 const MSR_FMASK: usize = 0xc0000084;
 
-extern "C" fn sys_write() {
+extern "C" fn dispatch_syscall(
+    context_addr: u64,
+    syscall_id: u64,
+    arg1: u64, arg2: u64, arg3: u64
+) {
     printk!("x86_64::syscall: write");
 }
 
@@ -27,6 +31,12 @@ extern "C" fn handle_syscall() {
             "push r13",
             "push r14",
             "push r15",
+
+            "mov r8, rdx", // Fifth argument <- Syscall third argument
+            "mov rcx, rsi", // Fourth argument <- Syscall second argument
+            "mov rdx, rdi", // Third argument <- Syscall first argument
+            "mov rsi, rax", // Second argument is the syscall number
+            "mov rdi, rsp", // First argument is the Context address
             // Call the rust handler
             "call {sys_write}",
             "pop r15", // restore callee-saved registers
@@ -48,7 +58,7 @@ extern "C" fn handle_syscall() {
             "push r11",
             "popf", // Set RFLAGS
             "jmp rcx",
-            sys_write = sym sys_write,
+            sys_write = sym dispatch_syscall,
             user_code_start = const(thread::USER_CODE_START),
             user_code_end = const(thread::USER_CODE_END),
         );
