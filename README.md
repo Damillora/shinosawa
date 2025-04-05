@@ -3,6 +3,8 @@ an operating system for those who find joy in things that don't go well, written
 
 # Components
 - [shinosawa::system::kernel](shinosawa/system/kernel/README.md)
+- [shinosawa::system::kotono](shinosawa/system/kotono/README.md)
+- [shinosawa::system::sysface](shinosawa/system/sysface/README.md)
 - [tools::koukei](tools/koukei/README.md)
 
 ## Contributing
