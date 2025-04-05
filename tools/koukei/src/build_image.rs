@@ -69,6 +69,7 @@ fn create_fat_image(kernel_path: String) {
 
     let mut files = HashMap::new();
     files.insert(kernel_path, String::from("shinosawa/system/kernel"));
+    files.insert(String::from("target/x86_64-shinosawa/debug/kotono"), String::from("shinosawa/system/kotono"));
     copy_shinosawa_system_files(root_dir, files);
 }
 
