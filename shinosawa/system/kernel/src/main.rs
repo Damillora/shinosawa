@@ -95,6 +95,7 @@ pub fn kernel_main() {
 
     file.read(&mut buf).unwrap();
 
+    
     let entry_point = crate::loader::elf::load_elf(&buf).unwrap();
     
     // We can *actually* start a user process now.

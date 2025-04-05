@@ -43,7 +43,6 @@ impl SnLimineFrameAllocator {
         let start_addr = region.base;
         let end_addr = region.base + region.length;
         let nframes = (end_addr - start_addr) / 4096 ;
-        printk!("usable frame: {}", nframes);
 
         let level_3_virt_addr = physical_memory_offset + start_addr;
         let level_2_virt_addr = level_3_virt_addr + 8u64;
@@ -86,6 +85,7 @@ impl SnLimineFrameAllocator {
         let addr_ranges = usable_regions.map(|r| r.base..(r.base + r.length));
         // transform to an iterator of frame start addresses
         let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
+
         // create `PhysFrame` types from the start addresses
         frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
@@ -159,7 +159,6 @@ unsafe impl FrameAllocator<Size4KiB> for SnLimineFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
         let frame = self.fetch_frame();
         
-
         let frame = self.usable_frames().nth(frame as usize);
 
         frame

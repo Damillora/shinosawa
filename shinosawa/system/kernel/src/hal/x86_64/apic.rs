@@ -68,7 +68,8 @@ pub fn init() {
         }
 
         printk!("x86_64::apic: unleashing IO APIC");
-        let io_apic_phys_address = apic.io_apics[0].address;
+        let io_apic_obj: acpi::platform::interrupt::IoApic = apic.io_apics[0];
+        let io_apic_phys_address = io_apic_obj.address;
         let io_apic_virt_address = paging::phys_to_virt_addr(PhysAddr::new(io_apic_phys_address as u64));
         
         map_phys_page(SnPhysAddr::new(io_apic_phys_address as u64),SnVirtAddr::new(io_apic_virt_address.as_u64()));

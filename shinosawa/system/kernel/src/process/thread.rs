@@ -6,7 +6,7 @@ use conquer_once::spin::OnceCell;
 use spin::rwlock::RwLock;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
-use crate::{hal::interface::interrupt::{InterruptStackIndex, INTERRUPT_CONTEXT_SIZE, SCHEDULE}, memory::SnVirtAddr, printk};
+use crate::{hal::{interface::interrupt::{InterruptStackIndex, INTERRUPT_CONTEXT_SIZE, SCHEDULE}, x86_64::paging}, loader::SnExecutable, memory::{SnPhysAddr, SnVirtAddr}, printk};
 
 #[derive(Debug)]
 struct Thread {
@@ -15,6 +15,8 @@ struct Thread {
     kernel_stack_end: u64, // This address goes in the TSS
     user_stack_end: u64,
     context: u64, // Address of Context on kernel stack
+
+    page_table_addr: u64,
 }
 
 static RUNNING_QUEUE: OnceCell<RwLock<VecDeque<Box<Thread>>>> = OnceCell::new(RwLock::new(VecDeque::new()));
@@ -40,7 +42,8 @@ pub fn new_kernel_thread(function: fn()->()) {
             user_stack,
             kernel_stack_end,
             user_stack_end,
-            context})
+            context, 
+            page_table_addr: 0})
     };
 
     unsafe { crate::hal::interface::cpu::set_context(new_thread.context, function as u64, new_thread.user_stack_end, false) };
@@ -50,8 +53,9 @@ pub fn new_kernel_thread(function: fn()->()) {
     });
 }
 
-pub fn new_user_thread(entry_point: SnVirtAddr) {
-    printk!("process: spawning new user thread {:x}", entry_point.as_u64());
+pub fn new_user_thread<T: SnExecutable>(executable: T) {
+    printk!("process: spawning new user thread {:x}", executable.entry_point().as_u64());
+
     let new_thread = {
         let kernel_stack = Vec::with_capacity(KERNEL_STACK_SIZE as usize);
         let kernel_stack_end = (SnVirtAddr::from_ptr(kernel_stack.as_ptr())
@@ -66,10 +70,11 @@ pub fn new_user_thread(entry_point: SnVirtAddr) {
             user_stack,
             kernel_stack_end,
             user_stack_end,
-            context})
+            context,
+            page_table_addr: executable.page_table_phys().as_u64() })
     };
 
-    unsafe { crate::hal::interface::cpu::set_context(new_thread.context, entry_point.as_u64(), new_thread.user_stack_end, true)};
+    unsafe { crate::hal::interface::cpu::set_context(new_thread.context, executable.entry_point().as_u64(), new_thread.user_stack_end, true)};
 
     crate::hal::interface::interrupt::without_interrupts(|| {
         RUNNING_QUEUE.get().unwrap().write().push_back(new_thread);
@@ -104,6 +109,13 @@ fn schedule_next(context_addr: usize) -> usize {
             crate::hal::interface::interrupt::set_interrupt_stack_table(
               InterruptStackIndex::Timer as usize,
               SnVirtAddr::new(thread.kernel_stack_end));
+
+            if thread.page_table_addr != 0 {
+                // Change page table
+                // Note: zero for kernel thread
+                paging::switch_page_table(SnPhysAddr::new(thread.page_table_addr));
+            }
+
             // Point the stack to the new context
             thread.context as usize
           },
