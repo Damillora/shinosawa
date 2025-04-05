@@ -7,6 +7,8 @@ pub mod interrupt;
 pub mod cpu;
 /// Memory paging
 pub mod paging;
+/// x86 system call
+pub mod syscall;
 
 /// x86_64 GDT setup
 mod gdt;

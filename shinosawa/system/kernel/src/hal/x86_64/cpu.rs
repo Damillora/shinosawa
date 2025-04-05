@@ -10,7 +10,7 @@ pub fn init() {
     interrupt::init();
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(packed)]
 pub struct SnCpuContext {
     // These are pushed in the handler function
@@ -34,11 +34,11 @@ pub struct SnCpuContext {
     pub _rax: usize,
     // Below is the exception stack frame pushed by the CPU on interrupt
     // Note: For some interrupts (e.g. Page fault), an error code is pushed here
-    rip: usize,     // Instruction pointer
-    cs: usize,      // Code segment
-    rflags: usize,  // Processor flags
-    rsp: usize,     // Stack pointer
-    ss: usize,      // Stack segment
+    pub rip: usize,     // Instruction pointer
+    pub cs: usize,      // Code segment
+    pub rflags: usize,  // Processor flags
+    pub rsp: usize,     // Stack pointer
+    pub ss: usize,      // Stack segment
     // Here the CPU may push values to align the stack on a 16-byte boundary (for SSE)
 }
 

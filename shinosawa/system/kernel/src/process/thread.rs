@@ -31,6 +31,11 @@ static CURRENT_THREAD: RwLock<Option<Box<Thread>>> = RwLock::new(None);
 
 static THREAD_COUNTER: OnceCell<RwLock<u64>> = OnceCell::new(RwLock::new(0));
 
+/// Lowest address that user code can be loaded into
+pub const USER_CODE_START: u64 = 0x20_0000;
+/// Exclusive upper limit for user code or data
+pub const USER_CODE_END: u64 = 0x5000_0000;
+
 const KERNEL_STACK_SIZE: u64 = 4096 * 2;
 const USER_STACK_SIZE: u64 = 4096 * 2;
 
@@ -95,7 +100,6 @@ pub fn new_user_thread<T: SnExecutable>(executable: T) {
         let user_stack = USER_STACK_START;
         let user_stack_end = (SnVirtAddr::new(user_stack) + USER_STACK_SIZE).as_u64();
 
-
         crate::hal::interface::interrupt::without_interrupts(|| {
             crate::hal::interface::paging::with_page_table(executable.page_table_phys(), || {
                 crate::hal::interface::paging::map_user_memory(
@@ -143,7 +147,7 @@ fn schedule_next(context_addr: usize) -> usize {
     let mut current_thread = CURRENT_THREAD.write();
 
     if let Some(mut thread) = current_thread.take() {
-        // Save the location of the Context struct
+        // // Save the location of the Context struct
         thread.context = context_addr as u64;
         // Save the page table. This is to enable context
         // switching during functions which manipulate page tables

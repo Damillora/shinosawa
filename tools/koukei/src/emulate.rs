@@ -17,10 +17,9 @@ pub fn command(image: String) {
     let exit_status = Command::new("qemu-system-x86_64")
         .envs(env::vars())
         .args([
-            "-accel",
-            "kvm",
             "-M",
-            "q35",
+            "q35,accel=tcg",
+            "-cpu","IvyBridge,+x2apic",
             "-drive",
             "if=pflash,unit=0,format=raw,file=ovmf/OVMF_CODE.4m.fd,readonly=on",
             "-drive",
@@ -31,6 +30,9 @@ pub fn command(image: String) {
             "1G",
             "-serial",
             "stdio",
+            // "-s",
+            // "-d",
+            // "int"
         ])
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())

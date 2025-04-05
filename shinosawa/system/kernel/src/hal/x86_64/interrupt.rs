@@ -9,7 +9,7 @@ use x86_64::{
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
 };
 
-use super::apic;
+use super::{apic, cpu::SnCpuContext};
 
 
 static IDT: OnceCell<InterruptDescriptorTable> = OnceCell::uninit();
@@ -153,7 +153,10 @@ fn platform_handler(idx: u8) {
 extern "C" fn timer_interrupt_handler(context_addr: usize) -> usize{
     if SCHEDULE.is_initialized() {
         let next_stack = (SCHEDULE.get().unwrap())(context_addr);
-        
+        let ctx = unsafe { *(context_addr as *const SnCpuContext).clone() };
+        if ctx.ss == 0 {
+            printk!("something weird is happening");
+        }
         let mut lapic = LOCAL_APIC.get().unwrap().lock();
         unsafe { lapic.end_of_interrupt() };
 
@@ -197,13 +200,14 @@ pub extern "x86-interrupt" fn timer_interrupt_handler_preempt(_stack_frame: Inte
             // Call the hander function
             "call {handler}",
 
-            // New: stack pointer is in RAX
+            // New stack pointer is in RAX
+            // (C calling convention return value)
             "cmp rax, 0",
             "je 2f",        // if rax != 0 {
             "mov rsp, rax", //   rsp = rax;
             "2:",           // }
 
-            // Pop scratch registers
+            // Pop scratch registers from new stack
             "pop r15",
             "pop r14",
             "pop r13",

@@ -97,7 +97,10 @@ pub fn kernel_main() {
 
     
     let entry_point = crate::loader::elf::load_elf(&buf).unwrap();
-    
+
+    // Initialize syscalls
+    crate::hal::interface::syscall::init();
+
     // We can *actually* start a user process now.
     crate::process::thread::new_user_thread(entry_point);
 
