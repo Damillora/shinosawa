@@ -137,7 +137,7 @@ extern "x86-interrupt" fn general_protection_fault_handler(
     stack_frame: InterruptStackFrame,
     _error_code: u64,
 ) {
-    printk!("x86_64: general protection fault: {:16b}", _error_code);
+    printk!("x86_64: general protection fault: {:x}", _error_code);
 
     printk!("{:#?}", stack_frame);
 

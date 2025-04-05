@@ -3,14 +3,11 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
-use conquer_once::{noblock::Once, spin::OnceCell};
+use conquer_once::spin::OnceCell;
 use spin::rwlock::RwLock;
 
 use crate::{
-    hal::{
-        interface::interrupt::{INTERRUPT_CONTEXT_SIZE, InterruptStackIndex, SCHEDULE},
-        x86_64::paging,
-    },
+    hal::interface::{interrupt::{INTERRUPT_CONTEXT_SIZE, InterruptStackIndex, SCHEDULE},paging},
     loader::SnExecutable,
     memory::{SnPhysAddr, SnVirtAddr},
     printk,
@@ -148,7 +145,6 @@ fn schedule_next(context_addr: usize) -> usize {
     if let Some(mut thread) = current_thread.take() {
         // Save the location of the Context struct
         thread.context = context_addr as u64;
-
         // Save the page table. This is to enable context
         // switching during functions which manipulate page tables
         // for example new_user_thread

@@ -78,7 +78,7 @@ pub fn init() {
 
     GDT.get().unwrap().0.load();
     unsafe {
-        SS::set_reg(SegmentSelector { 0: 0 });
+        SS::set_reg( GDT.get().unwrap().1.data_selector);
         CS::set_reg(GDT.get().unwrap().1.code_selector);
         load_tss(GDT.get().unwrap().1.tss_selector);
     }
