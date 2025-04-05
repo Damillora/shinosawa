@@ -2,7 +2,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
-use conquer_once::spin::OnceCell;
+use conquer_once::{noblock::Once, spin::OnceCell};
 use spin::rwlock::RwLock;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
@@ -10,6 +10,7 @@ use crate::{hal::{interface::interrupt::{InterruptStackIndex, INTERRUPT_CONTEXT_
 
 #[derive(Debug)]
 struct Thread {
+    id: u64,
     kernel_stack: Vec<u8>,
     user_stack: Vec<u8>,
     kernel_stack_end: u64, // This address goes in the TSS
@@ -23,8 +24,18 @@ static RUNNING_QUEUE: OnceCell<RwLock<VecDeque<Box<Thread>>>> = OnceCell::new(Rw
 
 static CURRENT_THREAD: RwLock<Option<Box<Thread>>> = RwLock::new(None);
 
+static THREAD_COUNTER: OnceCell<RwLock<u64>> = OnceCell::new(RwLock::new(0));
+
 const KERNEL_STACK_SIZE: u64 = 4096 * 2;
 const USER_STACK_SIZE: u64 = 4096 * 5;
+
+pub fn new_thread_id() -> u64 {
+    crate::hal::interface::interrupt::without_interrupts(|| {
+        let mut counter = THREAD_COUNTER.get().unwrap().write();
+        *counter += 1;
+        *counter        
+    })
+}
 
 pub fn new_kernel_thread(function: fn()->()) {
     printk!("process: spawning new kernel thread {:x}", function as u64);
@@ -38,6 +49,7 @@ pub fn new_kernel_thread(function: fn()->()) {
         let context = kernel_stack_end - INTERRUPT_CONTEXT_SIZE as u64;
 
         Box::new(Thread {
+            id: new_thread_id(),
             kernel_stack,
             user_stack,
             kernel_stack_end,
@@ -66,6 +78,7 @@ pub fn new_user_thread<T: SnExecutable>(executable: T) {
         let context = kernel_stack_end - INTERRUPT_CONTEXT_SIZE as u64;
 
         Box::new(Thread {
+            id: new_thread_id(),
             kernel_stack,
             user_stack,
             kernel_stack_end,

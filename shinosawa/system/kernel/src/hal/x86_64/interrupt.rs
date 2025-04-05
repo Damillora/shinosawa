@@ -294,8 +294,8 @@ fn test_breakpoint_exception() {
     x86_64::instructions::interrupts::int3();
 }
 
-pub fn without_interrupts<T: FnOnce() -> ()>(a: T) {
-    interrupts::without_interrupts(a);
+pub fn without_interrupts<F, R>(a: F) -> R where F: FnOnce() -> R {
+    interrupts::without_interrupts(a)
 }
 
 pub fn set_interrupt_stack_table(index: usize, stack_end: SnVirtAddr) {
