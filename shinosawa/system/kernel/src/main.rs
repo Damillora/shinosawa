@@ -99,7 +99,7 @@ pub fn kernel_main() {
 
     let file = crate::fs::vfs::find("SNSW:/shinosawa/system/kotono").unwrap();
     let len = file.len();
-    let mut buf = [0; 10000];
+    let mut buf = [0; 20000];
 
     file.read(&mut buf).unwrap();
 

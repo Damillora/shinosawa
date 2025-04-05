@@ -1,11 +1,14 @@
 extern crate alloc;
 
+use core::arch::asm;
+
 use alloc::vec::Vec;
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use conquer_once::spin::OnceCell;
 use spin::rwlock::RwLock;
 
+use crate::hal::interface::cpu::SnCpuContext;
 use crate::{
     hal::interface::{interrupt::{INTERRUPT_CONTEXT_SIZE, InterruptStackIndex, SCHEDULE},paging},
     loader::SnExecutable,
@@ -180,6 +183,89 @@ fn schedule_next(context_addr: usize) -> usize {
             thread.context as usize
         }
         None => 0, // Timer handler won't modify stack
+    }
+}
+
+pub fn fork_current_thread(current_context: &mut SnCpuContext) {
+    if let Some(current_thread) = CURRENT_THREAD.read().as_ref() {
+        printk!(
+            "process: forking thread {:x}",
+            current_context.instruction_pointer(),
+        );
+
+        let page_table_phys_addr = crate::hal::interface::paging::get_current_page_table_phys_addr();
+
+        let new_thread = {
+            let thread_id = new_thread_id();
+            let kernel_stack = Vec::with_capacity(KERNEL_STACK_SIZE as usize);
+            let kernel_stack_end =
+                (SnVirtAddr::from_ptr(kernel_stack.as_ptr()) + KERNEL_STACK_SIZE).as_u64();
+
+            let context = kernel_stack_end - INTERRUPT_CONTEXT_SIZE as u64;
+            // The 4096 (1 page) offset is a guard page
+            let user_stack = USER_STACK_START + (thread_id * (USER_STACK_SIZE + 4096));
+            let user_stack_end = (SnVirtAddr::new(user_stack) + USER_STACK_SIZE).as_u64();
+            crate::hal::interface::interrupt::without_interrupts(|| {
+                crate::hal::interface::paging::with_page_table(SnPhysAddr::new(page_table_phys_addr), || {
+                    crate::hal::interface::paging::map_user_memory(
+                        SnVirtAddr::new(user_stack),
+                        SnVirtAddr::new(user_stack_end),
+                    );
+                })
+            });
+
+            Box::new(Thread {
+                id: new_thread_id(),
+                kernel_stack,
+                kernel_stack_end,
+                user_stack_end,
+                context,
+                page_table_addr: page_table_phys_addr,
+            })
+        };
+
+        unsafe {
+            crate::hal::interface::cpu::set_context(
+                new_thread.context,
+                current_context.instruction_pointer() as u64,
+                new_thread.user_stack_end,
+                true,
+            )
+        };
+
+        let new_context = unsafe {&mut *(new_thread.context as *mut SnCpuContext)};
+        *new_context = current_context.clone(); // Copy of caller
+
+        new_context.set_ret_val_1(0); // No error
+        new_context.set_arg_val_1(0); // Indicates that this is the new thread
+        current_context.set_ret_val_1(0); // Also success
+        current_context.set_arg_val_1( new_thread.id as usize);
+
+        crate::hal::interface::interrupt::without_interrupts(|| {
+            RUNNING_QUEUE.get().unwrap().write().push_back(new_thread);
+        });
+    } else {
+        current_context.set_ret_val_1(1);
+    }
+}
+
+pub fn exit_current_thread(_current_context: &mut SnCpuContext) {
+    {
+        let mut current_thread = CURRENT_THREAD.write();
+
+        if let Some(_thread) = current_thread.take() {
+            // Drop thread, freeing stacks. If this is the last thread
+            // in this process, memory and page tables will be freed
+            // in the Process drop() function
+        }
+    }
+    // Can't return from this syscall, so this thread now waits for a
+    // timer interrupt to switch context.
+    unsafe {
+        asm!("sti",
+             "2:",
+             "hlt",
+             "jmp 2b");
     }
 }
 

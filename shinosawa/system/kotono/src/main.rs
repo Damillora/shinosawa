@@ -2,6 +2,7 @@
 #![no_main]
 
 use core::{arch::asm, panic::PanicInfo};
+use shinosawa_system_sysface::{_print, print, println, syscall};
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
@@ -10,12 +11,12 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "sysv64" fn _start() -> ! {
-    let s = "hello";
-    unsafe {
-        asm!("mov rax, 1", // syscall function
-             "syscall",
-             in("rdi") s.as_ptr(), // First argument
-             in("rsi") s.len()); // Second argument
+    println!("shinosawa::system::kotono: starting init");
+
+    extern "C" fn a(a: usize) {
+        println!("shinosawa::system::kotono: after fork");
     }
-    loop {}
+    syscall::fork(a, 5);
+
+    syscall::exit();
 }

@@ -26,12 +26,12 @@ pub struct SnCpuContext {
     pub _r8: usize,
     pub _rbp: usize,
     pub _rsi: usize,
-    pub _rdi: usize,
+    pub rdi: usize,
 
     pub _rdx: usize,
     pub _rcx: usize,
     pub _rbx: usize,
-    pub _rax: usize,
+    pub rax: usize,
     // Below is the exception stack frame pushed by the CPU on interrupt
     // Note: For some interrupts (e.g. Page fault), an error code is pushed here
     pub rip: usize,     // Instruction pointer
@@ -44,6 +44,18 @@ pub struct SnCpuContext {
 impl SnCpuContext {
     pub fn instruction_pointer(&self) -> usize {
         self.rip
+    }
+
+    pub fn set_stack_pointer(&mut self, rsp: usize) {
+        self.rsp = rsp;
+    }
+
+    pub fn set_ret_val_1(&mut self, rax: usize) {
+        self.rax = rax;
+    }
+
+    pub fn set_arg_val_1(&mut self, rdi: usize) {
+        self.rdi = rdi;
     }
 }
 pub unsafe fn set_context(context_addr: u64, function: u64, user_stack_end: u64, user: bool) {

@@ -1,6 +1,8 @@
 use crate::{hal::x86_64::gdt, printk, process::thread, syscall::SYSCALL_CONTROLLER};
 use core::arch::{asm, naked_asm};
 
+use super::cpu::SnCpuContext;
+
 const MSR_STAR: usize = 0xc0000081;
 const MSR_LSTAR: usize = 0xc0000082;
 const MSR_FMASK: usize = 0xc0000084;
@@ -13,8 +15,17 @@ extern "C" fn dispatch_syscall(
     syscall_id: u64,
     arg1: u64, arg2: u64, arg3: u64
 ) {
+    let context_ptr = context_addr as *mut SnCpuContext;
+    let context = unsafe{&mut *context_ptr};
+
+    // Set the CS and SS segment selectors
+    let (code_selector, data_selector) =
+          gdt::get_user_segments();
+    context.cs = code_selector.0 as usize;
+    context.ss = data_selector.0 as usize;
+
     let syscall_controller = SYSCALL_CONTROLLER.get().unwrap().read();
-    syscall_controller.run_handler(syscall_id, arg1, arg2, arg3);
+    syscall_controller.run_handler(syscall_id, context, arg1, arg2, arg3);
 }
 
 #[naked]
@@ -28,7 +39,7 @@ extern "C" fn handle_syscall() {
             "mov rsp, gs:{tss_timer}", // load kernel RSP
             // Move stack pointer by two pages
             "sub rsp, {ks_offset}",
-            
+
             "sub rsp, 8", // To be replaced with SS
             "push gs:{tss_syscall}", // user RSP
             "swapgs",
@@ -36,12 +47,24 @@ extern "C" fn handle_syscall() {
             "push r11", // Caller's RFLAGS
             "sub rsp, 8",  // CS
             "push rcx", // Caller's RIP
+
             // backup registers for sysretq
+            
+            "push rax",
+            "push rbx",
             "push rcx",
-            "push r11",
+            "push rdx",
+
+            "push rdi",
+            "push rsi",
             "push rbp",
-            "push rbx", // save callee-saved registers
+            "push r8",
+
+            "push r9",
+            "push r10",
+            "push r11",
             "push r12",
+
             "push r13",
             "push r14",
             "push r15",
@@ -53,15 +76,31 @@ extern "C" fn handle_syscall() {
             "mov rdi, rsp", // First argument is the Context address
             // Call the rust handler
             "call {sys_write}",
+            
             "pop r15", // restore callee-saved registers
             "pop r14",
             "pop r13",
-            "pop r12",
-            "pop rbx",
-            "pop rbp", // restore stack and registers for sysretq
-            "pop r11",
-            "pop rcx",
 
+            "pop r12",
+            "pop r11",
+            "pop r10",
+            "pop r9",
+
+            "pop r8",
+            "pop rbp",
+            "pop rsi",
+            "pop rdi",
+
+            "pop rdx",
+            "pop rcx",
+            "pop rbx",
+            "pop rax",
+
+            "add rsp, 24", // Skip RIP, CS and RFLAGS
+            "pop rsp", // Restore user stack
+            // No need to pop SS
+
+            // No need to pop SS
             "cmp rcx, {user_code_start}",
             "jl 2f", // rip < USER_CODE_START
             "cmp rcx, {user_code_end}",

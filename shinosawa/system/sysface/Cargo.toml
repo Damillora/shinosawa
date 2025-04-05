@@ -1,0 +1,11 @@
+[package]
+name = "shinosawa_system_sysface"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[lib]
+path = "src/lib.rs"
+test = false
+bench = false

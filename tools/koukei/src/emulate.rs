@@ -30,7 +30,7 @@ pub fn command(image: String) {
             "1G",
             "-serial",
             "stdio",
-            // "-s",
+            "-s",
             // "-d",
             // "int"
         ])

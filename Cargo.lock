@@ -226,6 +226,13 @@ dependencies = [
 [[package]]
 name = "shinosawa_system_kotono"
 version = "0.1.0"
+dependencies = [
+ "shinosawa_system_sysface",
+]
+
+[[package]]
+name = "shinosawa_system_sysface"
+version = "0.1.0"
 
 [[package]]
 name = "spin"
