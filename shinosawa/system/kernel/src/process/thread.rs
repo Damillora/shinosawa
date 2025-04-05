@@ -31,13 +31,16 @@ static CURRENT_THREAD: RwLock<Option<Box<Thread>>> = RwLock::new(None);
 
 static THREAD_COUNTER: OnceCell<RwLock<u64>> = OnceCell::new(RwLock::new(0));
 
+// Allocate pages for the user stack
+const USER_STACK_START: u64 = 0x5002000;
+
 /// Lowest address that user code can be loaded into
 pub const USER_CODE_START: u64 = 0x20_0000;
 /// Exclusive upper limit for user code or data
 pub const USER_CODE_END: u64 = 0x5000_0000;
 
 const KERNEL_STACK_SIZE: u64 = 4096 * 2;
-const USER_STACK_SIZE: u64 = 4096 * 2;
+const USER_STACK_SIZE: u64 = 4096 * 8;
 
 pub fn new_thread_id() -> u64 {
     crate::hal::interface::interrupt::without_interrupts(|| {
@@ -50,6 +53,7 @@ pub fn new_thread_id() -> u64 {
 pub fn new_kernel_thread(function: fn() -> ()) {
     printk!("process: spawning new kernel thread {:x}", function as u64);
     let new_thread = {
+        let thread_id = new_thread_id();
         let kernel_stack =
             Vec::with_capacity(KERNEL_STACK_SIZE as usize + USER_STACK_SIZE as usize);
         let kernel_stack_end =
@@ -59,7 +63,7 @@ pub fn new_kernel_thread(function: fn() -> ()) {
         let context = kernel_stack_end - INTERRUPT_CONTEXT_SIZE as u64;
 
         Box::new(Thread {
-            id: new_thread_id(),
+            id: thread_id,
             kernel_stack,
             kernel_stack_end,
             user_stack_end,
@@ -89,15 +93,14 @@ pub fn new_user_thread<T: SnExecutable>(executable: T) {
     );
 
     let new_thread = {
+        let thread_id = new_thread_id();
         let kernel_stack = Vec::with_capacity(KERNEL_STACK_SIZE as usize);
         let kernel_stack_end =
             (SnVirtAddr::from_ptr(kernel_stack.as_ptr()) + KERNEL_STACK_SIZE).as_u64();
 
         let context = kernel_stack_end - INTERRUPT_CONTEXT_SIZE as u64;
-        // Allocate pages for the user stack
-        const USER_STACK_START: u64 = 0x5002000;
-
-        let user_stack = USER_STACK_START;
+        // The 4096 (1 page) offset is a guard page
+        let user_stack = USER_STACK_START + (thread_id * (USER_STACK_SIZE + 4096));
         let user_stack_end = (SnVirtAddr::new(user_stack) + USER_STACK_SIZE).as_u64();
 
         crate::hal::interface::interrupt::without_interrupts(|| {
