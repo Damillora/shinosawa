@@ -103,8 +103,6 @@ pub fn kernel_main() {
     let mut buf: Vec<u8> = Vec::with_capacity(len);
     unsafe { buf.set_len(len) }; // Capacity is set in the previous line
     file.read(buf.as_mut_slice()).unwrap();
-    
-    printk!("{}", buf.len());
     let kotono = crate::loader::elf::load_elf(buf.as_slice()).unwrap();
 
     // We can *actually* start a user process now.
