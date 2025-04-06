@@ -9,6 +9,7 @@ pub enum Syscall {
     Max = 255,
 }
 
+#[derive(Debug)]
 pub struct SyscallError(u64);
 
 pub fn write(str: &str)  {

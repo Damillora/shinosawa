@@ -2,6 +2,7 @@ extern crate alloc;
 
 use core::arch::asm;
 
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
@@ -10,22 +11,16 @@ use spin::rwlock::RwLock;
 
 use crate::hal::interface::cpu::SnCpuContext;
 use crate::{
-    hal::interface::{interrupt::{INTERRUPT_CONTEXT_SIZE, InterruptStackIndex, SCHEDULE},paging},
+    hal::interface::{
+        interrupt::{INTERRUPT_CONTEXT_SIZE, InterruptStackIndex, SCHEDULE},
+        paging,
+    },
     loader::SnExecutable,
     memory::{SnPhysAddr, SnVirtAddr},
     printk,
 };
 
-#[derive(Debug)]
-struct Thread {
-    id: u64,
-    kernel_stack: Vec<u8>,
-    kernel_stack_end: u64, // This address goes in the TSS
-    user_stack_end: u64,
-    context: u64, // Address of Context on kernel stack
-
-    page_table_addr: u64,
-}
+use super::process::Process;
 
 static RUNNING_QUEUE: OnceCell<RwLock<VecDeque<Box<Thread>>>> =
     OnceCell::new(RwLock::new(VecDeque::new()));
@@ -33,6 +28,24 @@ static RUNNING_QUEUE: OnceCell<RwLock<VecDeque<Box<Thread>>>> =
 static CURRENT_THREAD: RwLock<Option<Box<Thread>>> = RwLock::new(None);
 
 static THREAD_COUNTER: OnceCell<RwLock<u64>> = OnceCell::new(RwLock::new(0));
+static PROCESS_COUNTER: OnceCell<RwLock<u64>> = OnceCell::new(RwLock::new(0));
+
+struct Thread {
+    id: u64,
+    process: Arc<Process>,
+    kernel_stack: Vec<u8>,
+    kernel_stack_end: u64, // This address goes in the TSS
+    user_stack_end: u64,
+    context: u64, // Address of Context on kernel stack
+
+    page_table_addr: u64,
+}
+impl Drop for Thread {
+    fn drop(&mut self) {
+        let _ =
+            crate::hal::interface::paging::free_user_stack(SnVirtAddr::new(self.user_stack_end));
+    }
+}
 
 // Allocate pages for the user stack
 const USER_STACK_START: u64 = 0x5002000;
@@ -53,6 +66,14 @@ pub fn new_thread_id() -> u64 {
     })
 }
 
+pub fn new_process_id() -> u64 {
+    crate::hal::interface::interrupt::without_interrupts(|| {
+        let mut counter = PROCESS_COUNTER.get().unwrap().write();
+        *counter += 1;
+        *counter
+    })
+}
+
 pub fn new_kernel_thread(function: fn() -> ()) {
     printk!("process: spawning new kernel thread {:x}", function as u64);
     let new_thread = {
@@ -67,6 +88,10 @@ pub fn new_kernel_thread(function: fn() -> ()) {
 
         Box::new(Thread {
             id: thread_id,
+            process: Arc::new(Process {
+                id: new_process_id(),
+                page_table_phys_addr: 0,
+            }),
             kernel_stack,
             kernel_stack_end,
             user_stack_end,
@@ -117,6 +142,10 @@ pub fn new_user_thread<T: SnExecutable>(executable: T) {
 
         Box::new(Thread {
             id: new_thread_id(),
+            process: Arc::new(Process {
+                id: new_process_id(),
+                page_table_phys_addr: executable.page_table_phys().as_u64(),
+            }),
             kernel_stack,
             kernel_stack_end,
             user_stack_end,
@@ -193,7 +222,8 @@ pub fn fork_current_thread(current_context: &mut SnCpuContext) {
             current_context.instruction_pointer(),
         );
 
-        let page_table_phys_addr = crate::hal::interface::paging::get_current_page_table_phys_addr();
+        let page_table_phys_addr =
+            crate::hal::interface::paging::get_current_page_table_phys_addr();
 
         let new_thread = {
             let thread_id = new_thread_id();
@@ -205,17 +235,22 @@ pub fn fork_current_thread(current_context: &mut SnCpuContext) {
             // The 4096 (1 page) offset is a guard page
             let user_stack = USER_STACK_START + (thread_id * (USER_STACK_SIZE + 4096));
             let user_stack_end = (SnVirtAddr::new(user_stack) + USER_STACK_SIZE).as_u64();
+
             crate::hal::interface::interrupt::without_interrupts(|| {
-                crate::hal::interface::paging::with_page_table(SnPhysAddr::new(page_table_phys_addr), || {
-                    crate::hal::interface::paging::map_user_memory(
-                        SnVirtAddr::new(user_stack),
-                        SnVirtAddr::new(user_stack_end),
-                    );
-                })
+                crate::hal::interface::paging::with_page_table(
+                    SnPhysAddr::new(page_table_phys_addr),
+                    || {
+                        crate::hal::interface::paging::map_user_memory(
+                            SnVirtAddr::new(user_stack),
+                            SnVirtAddr::new(user_stack_end),
+                        );
+                    },
+                )
             });
 
             Box::new(Thread {
                 id: new_thread_id(),
+                process: current_thread.process.clone(),
                 kernel_stack,
                 kernel_stack_end,
                 user_stack_end,
@@ -233,13 +268,13 @@ pub fn fork_current_thread(current_context: &mut SnCpuContext) {
             )
         };
 
-        let new_context = unsafe {&mut *(new_thread.context as *mut SnCpuContext)};
+        let new_context = unsafe { &mut *(new_thread.context as *mut SnCpuContext) };
         *new_context = current_context.clone(); // Copy of caller
 
         new_context.set_ret_val_1(0); // No error
         new_context.set_arg_val_1(0); // Indicates that this is the new thread
         current_context.set_ret_val_1(0); // Also success
-        current_context.set_arg_val_1( new_thread.id as usize);
+        current_context.set_arg_val_1(new_thread.id as usize);
 
         crate::hal::interface::interrupt::without_interrupts(|| {
             RUNNING_QUEUE.get().unwrap().write().push_back(new_thread);
@@ -262,10 +297,7 @@ pub fn exit_current_thread(_current_context: &mut SnCpuContext) {
     // Can't return from this syscall, so this thread now waits for a
     // timer interrupt to switch context.
     unsafe {
-        asm!("sti",
-             "2:",
-             "hlt",
-             "jmp 2b");
+        asm!("sti", "2:", "hlt", "jmp 2b");
     }
 }
 

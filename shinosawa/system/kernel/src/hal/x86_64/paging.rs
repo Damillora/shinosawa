@@ -124,6 +124,7 @@ pub fn create_new_user_pagetable() -> (SnVirtAddr, SnPhysAddr) {
     let (page_table_ptr, page_table_phys_addr) = create_empty_pagetable();
     let table = unsafe { &mut *page_table_ptr };
 
+    // Investigate why removing this causes physical address errors
     printk!(
         "paging::user_pagetable: {:x} {:x}",
         page_table_ptr as u64,
@@ -418,4 +419,94 @@ fn unmap_memory_inner(
     for page in page_range {
         mapper.unmap(page).expect("cannot unmap").1.flush();
     }
+}
+
+fn active_level_1_table_containing(
+    addr: VirtAddr
+) -> &'static mut PageTable {
+    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+    let current_page_table = get_current_page_table_phys_addr();
+    let mut table = unsafe { get_page_table_from_address(memory_info.physical_memory_offset, current_page_table) };
+
+    for index in [addr.p4_index(),
+                  addr.p3_index(),
+                  addr.p2_index()] {
+
+        let entry = &mut table[index];
+        table = unsafe {&mut *(memory_info.physical_memory_offset
+                               + entry.addr().as_u64()).as_mut_ptr()};
+    }
+
+    table
+}
+
+pub fn free_user_stack(
+    stack_end: SnVirtAddr
+) -> Result<(), &'static str> {
+    return Ok(());
+    
+    let addr = VirtAddr::new((stack_end - 1u64).as_u64()); // Address in last page
+    let table = active_level_1_table_containing(VirtAddr::new(stack_end.as_u64()));
+
+    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+
+    let iend = usize::from(addr.p1_index());
+    for index in ((iend - 6)..=iend).rev() {
+        let entry = &mut table[index];
+
+        // Only writable pages have unique frames
+        if entry.flags().contains(PageTableFlags::WRITABLE) {
+            // Free this frame
+            memory_info.frame_allocator.deallocate_frame(
+                entry.frame().unwrap());
+        }
+        entry.set_flags(PageTableFlags::empty());
+    }
+
+    Ok(())
+}
+
+pub fn free_user_pagetables(page_table_phys_addr: u64) {
+    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+
+    fn free_pages_rec(physical_memory_offset: VirtAddr,
+                      frame_allocator: &mut SnLimineFrameAllocator,
+                      table_physaddr: PhysAddr,
+                      level: u16) {
+        let table = unsafe{&mut *(physical_memory_offset
+                                  + table_physaddr.as_u64())
+                           .as_mut_ptr() as &mut PageTable};
+        for entry in table.iter() {
+            if !entry.is_unused() {
+                if (level == 1) || entry.flags().contains(PageTableFlags::HUGE_PAGE) {
+                    // Maps a frame, not a page table
+                    if entry.flags().contains(PageTableFlags::USER_ACCESSIBLE) {
+                        // A user frame => deallocate
+                        frame_allocator.deallocate_frame(
+                            entry.frame().unwrap());
+                    }
+                } else {
+                    // A page table
+                    free_pages_rec(physical_memory_offset,
+                                   frame_allocator,
+                                   entry.addr(),
+                                   level - 1);
+                }
+            }
+        }
+        // Free page table
+        frame_allocator.deallocate_frame(
+            PhysFrame::from_start_address(table_physaddr).unwrap());
+    }
+
+    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+    let kernel_table_phys_addr = (memory_info.kernel_l4_table as *mut PageTable as u64)
+        - memory_info.physical_memory_offset.as_u64();
+
+    with_page_table(SnPhysAddr::new(kernel_table_phys_addr), || {
+        free_pages_rec(memory_info.physical_memory_offset,
+            &mut memory_info.frame_allocator,
+            PhysAddr::new(page_table_phys_addr),
+            4);
+    });
 }

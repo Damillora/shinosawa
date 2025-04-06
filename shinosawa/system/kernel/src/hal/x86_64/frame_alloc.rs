@@ -132,9 +132,9 @@ impl SnLimineFrameAllocator {
 
     fn return_frame(&mut self, frame_number: u64) {
         // Calculate indices
-        let l1_index = frame_number % (64 * 64);
-        let l2_index = frame_number % 64;
-        let l3_index = frame_number / 64;
+        let l1_index = frame_number % 64;
+        let l2_index = frame_number / 64;
+        let l3_index = frame_number / (64*64);
 
         let l1_ptr = unsafe{(self.level_1_virt_addr.as_mut_ptr() as *mut u64)
             .offset(l3_index as isize * 64 +l2_index as isize)};
@@ -153,7 +153,7 @@ impl SnLimineFrameAllocator {
         }
     }
 
-    fn deallocate_frame(&mut self, frame: PhysFrame) {
+    pub fn deallocate_frame(&mut self, frame: PhysFrame) {
         let frame_number = (frame.start_address() - self.frame_phys_addr) / 4096;
         self.return_frame(frame_number);
     }

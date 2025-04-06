@@ -14,9 +14,12 @@ pub unsafe extern "sysv64" fn _start() -> ! {
     println!("shinosawa::system::kotono: starting init");
 
     extern "C" fn a(a: usize) {
-        println!("shinosawa::system::kotono: after fork");
+        println!("shinosawa::system::kotono: we are at pid {:x}", a);
+
+        syscall::exit();
     }
-    syscall::fork(a, 5);
+    let tid = syscall::fork(a, 5).unwrap();
+    println!("shinosawa::system::kotono: we forked with tid {:?}", tid);
 
     syscall::exit();
 }
