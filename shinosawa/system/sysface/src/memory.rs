@@ -8,6 +8,8 @@ static ALLOCATOR: Locked<LinkedListAllocator> = Locked::new(LinkedListAllocator:
 
 pub fn init(heap_start: usize, heap_end: usize) {
     {
+        // FIXME: where is the one locking this??
+        unsafe { ALLOCATOR.inner.force_unlock(); }
         let lock = ALLOCATOR.try_lock().expect("cannot lock alloc?!");
     }
 

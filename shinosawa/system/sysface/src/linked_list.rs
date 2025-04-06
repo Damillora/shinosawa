@@ -42,7 +42,6 @@ impl LinkedListAllocator {
     /// heap bounds are valid and that the heap is unused. This method must be
     /// called only once.
     pub unsafe fn init(&mut self, heap_start: usize, heap_size: usize) {
-        println!("a");
         unsafe {
             self.add_free_region(heap_start, heap_size);
         }

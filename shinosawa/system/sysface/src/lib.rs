@@ -87,7 +87,7 @@ pub unsafe extern "sysv64" fn _start() -> ! {
     println!("heap start: {:#016X}", heap_start);
     println!("heap end: {:#016X}", heap_end);
 
-    memory::init(heap_start, heap_end - heap_start);
+    memory::init(heap_start, heap_end);
     unsafe { main() };
 
     syscall::exit();

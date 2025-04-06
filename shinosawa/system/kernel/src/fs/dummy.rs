@@ -141,7 +141,7 @@ pub fn new_example_filesystem() -> SnDummyFilesystem {
                                                 ("kotono", Arc::new(SnDummyNode {
                                                     name: "kotono",
                                                     node_type: SnVfsType::File,
-                                                    contents: Some(include_bytes!("../../../../../target/x86_64-shinosawa/release/kotono")),
+                                                    contents: Some(include_bytes!("../../../../../target/x86_64-shinosawa/debug/kotono")),
                                                     children: None,
                                                 }) as SnVfsNodeRef)
                                             ])
