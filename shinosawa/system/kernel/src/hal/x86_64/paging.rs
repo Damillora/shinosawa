@@ -1,7 +1,6 @@
 // Allow mutable static, since any other way would lock things up for now.
 #![allow(static_mut_refs)]
 
-
 use core::ops::Range;
 
 use conquer_once::spin::OnceCell;
@@ -358,7 +357,7 @@ pub fn map_user_executable_memory(start_addr: SnVirtAddr, end_addr: SnVirtAddr) 
     let mut mapper: OffsetPageTable<'_> = unsafe { init_page_table(physical_memory_offset) };
     let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
     let end_addr_x86 = VirtAddr::new(end_addr.as_u64());
-
+    printk!("x86_paging: {:X} {:X}", start_addr_x86, end_addr_x86);
     map_user_memory_inner(
         &mut mapper,
         &mut memory_info.frame_allocator,
@@ -389,8 +388,15 @@ fn map_user_memory_inner(
         let frame = frame_allocator
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
-            
-        unsafe { mapper.map_to(page, frame, page_table_flags, frame_allocator)?.flush() };
+        if mapper.translate_page(page).is_ok() {
+            continue;
+        }
+        
+        unsafe {
+            mapper
+                .map_to(page, frame, page_table_flags, frame_allocator)?
+                .flush()
+        };
     }
 
     Ok(())
@@ -427,38 +433,41 @@ pub fn map_user_allocate_mem(start_addr: SnVirtAddr, end_addr: SnVirtAddr) {
 }
 
 fn find_empty_stack_entry(level_4_table: *mut PageTable, idx_1: u64, idx_2: u64) -> *mut PageTable {
-    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
-    let mut table = unsafe {&mut *level_4_table};
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let mut table = unsafe { &mut *level_4_table };
     let thread_stack_page_index: [u64; 2] = [idx_1, idx_2];
     for index in thread_stack_page_index {
         let entry = &mut table[index as usize];
         if entry.is_unused() {
             let (new_table_ptr, new_table_physaddr) = create_empty_pagetable();
-            entry.set_addr(PhysAddr::new(new_table_physaddr),
-               PageTableFlags::PRESENT |
-               PageTableFlags::WRITABLE |
-               PageTableFlags::USER_ACCESSIBLE);
+            entry.set_addr(
+                PhysAddr::new(new_table_physaddr),
+                PageTableFlags::PRESENT
+                    | PageTableFlags::WRITABLE
+                    | PageTableFlags::USER_ACCESSIBLE,
+            );
         }
-        table = unsafe {&mut *(memory_info.physical_memory_offset
-                                + entry.addr().as_u64())
-                            .as_mut_ptr()};
+        table = unsafe {
+            &mut *(memory_info.physical_memory_offset + entry.addr().as_u64()).as_mut_ptr()
+        };
     }
 
     table
 }
 
 /// Maps user accessible memory
-pub fn get_user_thread_stack(page_table_phys_addr: u64) -> Result<(u64, u64) , &'static str> {
+pub fn get_user_thread_stack(page_table_phys_addr: u64) -> Result<(u64, u64), &'static str> {
     let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
     let physical_memory_offset = memory_info.physical_memory_offset;
-    let mut table = unsafe { get_page_table_from_address(physical_memory_offset, page_table_phys_addr) };
+    let mut table =
+        unsafe { get_page_table_from_address(physical_memory_offset, page_table_phys_addr) };
     let mut thread_stack_index: [u64; 3] = [0, 0, 0];
     'all: for idx_1 in 3..6 {
         for idx_2 in 0..511 {
-            let page_table = unsafe {&mut *(find_empty_stack_entry(table, idx_1, idx_2)) };
+            let page_table = unsafe { &mut *(find_empty_stack_entry(table, idx_1, idx_2)) };
             for idx_3 in 0..512 {
                 if page_table[idx_3].is_unused() {
-                    table = unsafe {&mut *(page_table)};
+                    table = unsafe { &mut *(page_table) };
                     thread_stack_index[0] = idx_1;
                     thread_stack_index[1] = idx_2;
                     thread_stack_index[2] = idx_3 as u64;
@@ -468,28 +477,28 @@ pub fn get_user_thread_stack(page_table_phys_addr: u64) -> Result<(u64, u64) , &
         }
     }
     if thread_stack_index[0] == 0 {
-       return Err("All thread stack slots are full");
+        return Err("All thread stack slots are full");
     }
-    let slot_address: u64 =
-        ((thread_stack_index[0] as u64) << 39) +
-        ((thread_stack_index[1] as u64) << 30) +
-        ((thread_stack_index[2] as u64) << 21);
+    let slot_address: u64 = ((thread_stack_index[0] as u64) << 39)
+        + ((thread_stack_index[1] as u64) << 30)
+        + ((thread_stack_index[2] as u64) << 21);
 
-    Ok((slot_address + 4096,slot_address + USER_STACK_SIZE))
+    Ok((slot_address + 4096, slot_address + USER_STACK_SIZE))
 }
 
 /// Maps user accessible memory
-pub fn get_user_heap(page_table_phys_addr: u64) -> Result<(u64, u64) , &'static str> {
+pub fn get_user_heap(page_table_phys_addr: u64) -> Result<(u64, u64), &'static str> {
     let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
     let physical_memory_offset = memory_info.physical_memory_offset;
-    let mut table = unsafe { get_page_table_from_address(physical_memory_offset, page_table_phys_addr) };
+    let mut table =
+        unsafe { get_page_table_from_address(physical_memory_offset, page_table_phys_addr) };
     let mut thread_stack_index: [u64; 3] = [0, 0, 0];
     'all: for idx_1 in 7..11 {
         for idx_2 in 0..511 {
-            let page_table = unsafe {&mut *(find_empty_stack_entry(table, idx_1, idx_2)) };
+            let page_table = unsafe { &mut *(find_empty_stack_entry(table, idx_1, idx_2)) };
             for idx_3 in 0..256 {
                 if page_table[idx_3 * 2 + 1].is_unused() {
-                    table = unsafe {&mut *(page_table)};
+                    table = unsafe { &mut *(page_table) };
                     thread_stack_index[0] = idx_1;
                     thread_stack_index[1] = idx_2;
                     thread_stack_index[2] = idx_3 as u64;
@@ -499,14 +508,13 @@ pub fn get_user_heap(page_table_phys_addr: u64) -> Result<(u64, u64) , &'static 
         }
     }
     if thread_stack_index[0] == 0 {
-       return Err("All thread heap slots are full");
+        return Err("All thread heap slots are full");
     }
-    let slot_address: u64 =
-        ((thread_stack_index[0] as u64) << 39) +
-        ((thread_stack_index[1] as u64) << 30) +
-        ((thread_stack_index[2] as u64) << 21);
+    let slot_address: u64 = ((thread_stack_index[0] as u64) << 39)
+        + ((thread_stack_index[1] as u64) << 30)
+        + ((thread_stack_index[2] as u64) << 21);
 
-    Ok((slot_address + 4096,slot_address + USER_HEAP_SIZE))
+    Ok((slot_address + 4096, slot_address + USER_HEAP_SIZE))
 }
 
 /// Maps user accessible memory
@@ -537,11 +545,14 @@ fn map_missing_user_page_inner(
         .allocate_frame()
         .ok_or(MapToError::FrameAllocationFailed)?;
     let _ = mapper.unmap(page);
-    unsafe { mapper.map_to(page, frame, page_table_flags, frame_allocator)?.flush() };
+    unsafe {
+        mapper
+            .map_to(page, frame, page_table_flags, frame_allocator)?
+            .flush()
+    };
 
     Ok(())
 }
-
 
 pub fn unmap_memory(start_addr: SnVirtAddr, end_addr: SnVirtAddr) {
     let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
@@ -571,34 +582,30 @@ fn unmap_memory_inner(
     }
 }
 
-fn active_level_1_table_containing(
-    addr: VirtAddr
-) -> &'static mut PageTable {
-    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+fn active_level_1_table_containing(addr: VirtAddr) -> &'static mut PageTable {
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
     let current_page_table = get_current_page_table_phys_addr();
-    let mut table = unsafe { get_page_table_from_address(memory_info.physical_memory_offset, current_page_table) };
+    let mut table = unsafe {
+        get_page_table_from_address(memory_info.physical_memory_offset, current_page_table)
+    };
 
-    for index in [addr.p4_index(),
-                  addr.p3_index(),
-                  addr.p2_index()] {
-
+    for index in [addr.p4_index(), addr.p3_index(), addr.p2_index()] {
         let entry = &mut table[index];
-        table = unsafe {&mut *(memory_info.physical_memory_offset
-                               + entry.addr().as_u64()).as_mut_ptr()};
+        table = unsafe {
+            &mut *(memory_info.physical_memory_offset + entry.addr().as_u64()).as_mut_ptr()
+        };
     }
 
     table
 }
 
-pub fn free_user_stack(
-    stack_end: SnVirtAddr
-) -> Result<(), &'static str> {
+pub fn free_user_stack(stack_end: SnVirtAddr) -> Result<(), &'static str> {
     return Ok(());
-    
+
     let addr = VirtAddr::new((stack_end - 1u64).as_u64()); // Address in last page
     let table = active_level_1_table_containing(VirtAddr::new(stack_end.as_u64()));
 
-    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
 
     let iend = usize::from(addr.p1_index());
     for index in ((iend - 6)..=iend).rev() {
@@ -607,8 +614,9 @@ pub fn free_user_stack(
         // Only writable pages have unique frames
         if entry.flags().contains(PageTableFlags::WRITABLE) {
             // Free this frame
-            memory_info.frame_allocator.deallocate_frame(
-                entry.frame().unwrap());
+            memory_info
+                .frame_allocator
+                .deallocate_frame(entry.frame().unwrap());
         }
         entry.set_flags(PageTableFlags::empty());
     }
@@ -617,46 +625,50 @@ pub fn free_user_stack(
 }
 
 pub fn free_user_pagetables(page_table_phys_addr: u64) {
-    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
 
-    fn free_pages_rec(physical_memory_offset: VirtAddr,
-                      frame_allocator: &mut SnLimineFrameAllocator,
-                      table_physaddr: PhysAddr,
-                      level: u16) {
-        let table = unsafe{&mut *(physical_memory_offset
-                                  + table_physaddr.as_u64())
-                           .as_mut_ptr() as &mut PageTable};
+    fn free_pages_rec(
+        physical_memory_offset: VirtAddr,
+        frame_allocator: &mut SnLimineFrameAllocator,
+        table_physaddr: PhysAddr,
+        level: u16,
+    ) {
+        let table = unsafe {
+            &mut *(physical_memory_offset + table_physaddr.as_u64()).as_mut_ptr() as &mut PageTable
+        };
         for entry in table.iter() {
             if !entry.is_unused() {
                 if (level == 1) || entry.flags().contains(PageTableFlags::HUGE_PAGE) {
                     // Maps a frame, not a page table
                     if entry.flags().contains(PageTableFlags::USER_ACCESSIBLE) {
                         // A user frame => deallocate
-                        frame_allocator.deallocate_frame(
-                            entry.frame().unwrap());
+                        frame_allocator.deallocate_frame(entry.frame().unwrap());
                     }
                 } else {
                     // A page table
-                    free_pages_rec(physical_memory_offset,
-                                   frame_allocator,
-                                   entry.addr(),
-                                   level - 1);
+                    free_pages_rec(
+                        physical_memory_offset,
+                        frame_allocator,
+                        entry.addr(),
+                        level - 1,
+                    );
                 }
             }
         }
         // Free page table
-        frame_allocator.deallocate_frame(
-            PhysFrame::from_start_address(table_physaddr).unwrap());
+        frame_allocator.deallocate_frame(PhysFrame::from_start_address(table_physaddr).unwrap());
     }
 
-    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
     let kernel_table_phys_addr = (memory_info.kernel_l4_table as *mut PageTable as u64)
         - memory_info.physical_memory_offset.as_u64();
 
     with_page_table(SnPhysAddr::new(kernel_table_phys_addr), || {
-        free_pages_rec(memory_info.physical_memory_offset,
+        free_pages_rec(
+            memory_info.physical_memory_offset,
             &mut memory_info.frame_allocator,
             PhysAddr::new(page_table_phys_addr),
-            4);
+            4,
+        );
     });
 }

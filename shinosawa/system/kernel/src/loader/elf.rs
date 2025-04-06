@@ -57,11 +57,14 @@ pub fn load_elf(bin: &[u8]) -> Result<SnElfExecutable, &'static str> {
 
                     let segment_address = segment.address() as u64;
                     
-                    crate::hal::interface::paging::map_user_executable_memory(
-                        SnVirtAddr::new(segment_address),
-                        SnVirtAddr::new(segment_address) + segment.size() as u64,
-                    );
-
+                    crate::hal::interface::interrupt::without_interrupts(|| {
+                        with_page_table(user_page_table_physaddr, || {
+                            crate::hal::interface::paging::map_user_executable_memory(
+                                SnVirtAddr::new(segment_address),
+                                SnVirtAddr::new(segment_address) + segment.size() as u64,
+                            );
+                        });
+                    });
                     if let Ok(data) = segment.data() {
                         // Copy data
                         let dest_ptr = segment_address as *mut u8;

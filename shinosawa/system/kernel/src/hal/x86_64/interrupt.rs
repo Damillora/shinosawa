@@ -132,7 +132,6 @@ extern "x86-interrupt" fn page_fault_handler(
             
             crate::hal::interface::instruct::hcf();
         }
-
     } else {
 
         printk!("x86_64: page fault");

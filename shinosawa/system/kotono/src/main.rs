@@ -2,15 +2,11 @@
 #![no_main]
 
 use core::{arch::asm, panic::PanicInfo};
+#[macro_use]
 use shinosawa_system_sysface::{_print, print, println, syscall};
 
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
-}
-
 #[unsafe(no_mangle)]
-pub unsafe extern "sysv64" fn _start() -> ! {
+unsafe extern "C" fn main() -> ! {
     println!("shinosawa::system::kotono: starting init");
 
     extern "C" fn a(a: usize) {
