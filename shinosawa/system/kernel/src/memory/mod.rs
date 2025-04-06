@@ -5,6 +5,11 @@ pub mod alloc;
 // Linked list allocator
 pub mod linked_list;
 
+pub const KERNEL_STACK_SIZE: u64 = 4096 * 2; // 8 KiB stack
+pub const USER_STACK_SIZE: u64 = 4096 * 512; // 2 MiB stack (one page empty for guard)
+pub const USER_HEAP_SIZE: u64 = 4096 * 1024; // 4 MiB stack (one page empty for guard)
+
+
 /// A wrapper around spin::Mutex to permit trait implementations.
 pub struct Locked<A> {
     inner: spin::Mutex<A>,

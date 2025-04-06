@@ -124,13 +124,24 @@ extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     use x86_64::registers::control::Cr2;
+    let accessed_virtaddr = Cr2::read().expect("Cannot read accessed address");
 
-    printk!("x86_64: page fault");
-    printk!("you tried to access address: {:?}", Cr2::read());
-    printk!("error code: {:?}", error_code);
-    printk!("{:#?}", stack_frame);
+    if error_code == (PageFaultErrorCode::PROTECTION_VIOLATION | PageFaultErrorCode::CAUSED_BY_WRITE | PageFaultErrorCode::USER_MODE) {
+        if let Err(msg) = crate::hal::interface::paging::map_missing_user_page(SnVirtAddr::new(accessed_virtaddr.as_u64())) {
+            printk!("Page fault error:\n{:#?}", stack_frame);
+            
+            crate::hal::interface::instruct::hcf();
+        }
 
-    panic!("page fault");
+    } else {
+
+        printk!("x86_64: page fault");
+        printk!("you tried to access address: {:?}", accessed_virtaddr);
+        printk!("error code: {:?}", error_code);
+        printk!("{:#?}", stack_frame);
+
+        panic!("page fault");
+    }
 }
 
 extern "x86-interrupt" fn general_protection_fault_handler(

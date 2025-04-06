@@ -10,6 +10,7 @@ use conquer_once::spin::OnceCell;
 use spin::rwlock::RwLock;
 
 use crate::hal::interface::cpu::SnCpuContext;
+use crate::memory::{KERNEL_STACK_SIZE, USER_STACK_SIZE};
 use crate::{
     hal::interface::{
         interrupt::{INTERRUPT_CONTEXT_SIZE, InterruptStackIndex, SCHEDULE},
@@ -21,6 +22,14 @@ use crate::{
 };
 
 use super::process::Process;
+
+// Allocate pages for the user stack
+const USER_STACK_START: u64 = 0x5002000;
+
+/// Lowest address that user code can be loaded into
+pub const USER_CODE_START: u64 = 0x20_0000;
+/// Exclusive upper limit for user code or data
+pub const USER_CODE_END: u64 = 0x5000_0000;
 
 static RUNNING_QUEUE: OnceCell<RwLock<VecDeque<Box<Thread>>>> =
     OnceCell::new(RwLock::new(VecDeque::new()));
@@ -46,17 +55,6 @@ impl Drop for Thread {
             crate::hal::interface::paging::free_user_stack(SnVirtAddr::new(self.user_stack_end));
     }
 }
-
-// Allocate pages for the user stack
-const USER_STACK_START: u64 = 0x5002000;
-
-/// Lowest address that user code can be loaded into
-pub const USER_CODE_START: u64 = 0x20_0000;
-/// Exclusive upper limit for user code or data
-pub const USER_CODE_END: u64 = 0x5000_0000;
-
-const KERNEL_STACK_SIZE: u64 = 4096 * 2;
-const USER_STACK_SIZE: u64 = 4096 * 8;
 
 pub fn new_thread_id() -> u64 {
     crate::hal::interface::interrupt::without_interrupts(|| {
@@ -120,6 +118,9 @@ pub fn new_user_thread<T: SnExecutable>(executable: T) {
         executable.entry_point().as_u64()
     );
 
+    let (user_stack, user_stack_end) = paging::get_user_thread_stack(executable.page_table_phys().as_u64()).unwrap();
+    let (user_heap, user_heap_end) = paging::get_user_heap(executable.page_table_phys().as_u64()).unwrap();
+
     let new_thread = {
         let thread_id = new_thread_id();
         let kernel_stack = Vec::with_capacity(KERNEL_STACK_SIZE as usize);
@@ -128,14 +129,15 @@ pub fn new_user_thread<T: SnExecutable>(executable: T) {
 
         let context = kernel_stack_end - INTERRUPT_CONTEXT_SIZE as u64;
         // The 4096 (1 page) offset is a guard page
-        let user_stack = USER_STACK_START + (thread_id * (USER_STACK_SIZE + 4096));
-        let user_stack_end = (SnVirtAddr::new(user_stack) + USER_STACK_SIZE).as_u64();
-
         crate::hal::interface::interrupt::without_interrupts(|| {
             crate::hal::interface::paging::with_page_table(executable.page_table_phys(), || {
-                crate::hal::interface::paging::map_user_memory(
+                crate::hal::interface::paging::map_user_allocate_mem(
                     SnVirtAddr::new(user_stack),
                     SnVirtAddr::new(user_stack_end),
+                );
+                crate::hal::interface::paging::map_user_allocate_mem(
+                    SnVirtAddr::new(user_heap),
+                    SnVirtAddr::new(user_heap_end),
                 );
             })
         });
@@ -145,7 +147,8 @@ pub fn new_user_thread<T: SnExecutable>(executable: T) {
             process: Arc::new(Process {
                 id: new_process_id(),
                 page_table_phys_addr: executable.page_table_phys().as_u64(),
-            }),
+            }
+            ),
             kernel_stack,
             kernel_stack_end,
             user_stack_end,
@@ -160,7 +163,12 @@ pub fn new_user_thread<T: SnExecutable>(executable: T) {
             executable.entry_point().as_u64(),
             new_thread.user_stack_end,
             true,
-        )
+        );
+
+        // set registers for heap alloc
+
+        let context = &mut *(new_thread.context as *mut SnCpuContext) ;
+        context.set_heap_addrs(user_heap as usize, user_heap_end as usize);
     };
 
     crate::hal::interface::interrupt::without_interrupts(|| {
@@ -233,14 +241,14 @@ pub fn fork_current_thread(current_context: &mut SnCpuContext) {
 
             let context = kernel_stack_end - INTERRUPT_CONTEXT_SIZE as u64;
             // The 4096 (1 page) offset is a guard page
-            let user_stack = USER_STACK_START + (thread_id * (USER_STACK_SIZE + 4096));
-            let user_stack_end = (SnVirtAddr::new(user_stack) + USER_STACK_SIZE).as_u64();
+            
+        let (user_stack, user_stack_end) = paging::get_user_thread_stack(page_table_phys_addr).unwrap();
 
             crate::hal::interface::interrupt::without_interrupts(|| {
                 crate::hal::interface::paging::with_page_table(
                     SnPhysAddr::new(page_table_phys_addr),
                     || {
-                        crate::hal::interface::paging::map_user_memory(
+                        crate::hal::interface::paging::map_user_allocate_mem(
                             SnVirtAddr::new(user_stack),
                             SnVirtAddr::new(user_stack_end),
                         );

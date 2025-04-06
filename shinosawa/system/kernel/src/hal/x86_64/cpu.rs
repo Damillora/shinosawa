@@ -29,7 +29,7 @@ pub struct SnCpuContext {
     pub rdi: usize,
 
     pub _rdx: usize,
-    pub _rcx: usize,
+    pub rcx: usize,
     pub _rbx: usize,
     pub rax: usize,
     // Below is the exception stack frame pushed by the CPU on interrupt
@@ -52,6 +52,10 @@ impl SnCpuContext {
 
     pub fn set_ret_val_1(&mut self, rax: usize) {
         self.rax = rax;
+    }
+    pub fn set_heap_addrs(&mut self, start_addr: usize, end_addr: usize) {
+        self.rax = start_addr;
+        self.rcx = end_addr;
     }
 
     pub fn set_arg_val_1(&mut self, rdi: usize) {

@@ -2,6 +2,8 @@
 #![allow(static_mut_refs)]
 
 
+use core::ops::Range;
+
 use conquer_once::spin::OnceCell;
 use spin::RwLock;
 use x86_64::{
@@ -15,7 +17,7 @@ use x86_64::{
 
 use crate::{
     limine::MEMORY_MAP_REQUEST,
-    memory::{SnPhysAddr, SnVirtAddr},
+    memory::{SnPhysAddr, SnVirtAddr, USER_HEAP_SIZE, USER_STACK_SIZE},
     printk,
 };
 
@@ -349,7 +351,7 @@ unsafe fn map_phys_memory_inner(
 }
 
 /// Maps user accessible memory
-pub fn map_user_memory(start_addr: SnVirtAddr, end_addr: SnVirtAddr) {
+pub fn map_user_executable_memory(start_addr: SnVirtAddr, end_addr: SnVirtAddr) {
     let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
     let physical_memory_offset = memory_info.physical_memory_offset;
 
@@ -362,6 +364,7 @@ pub fn map_user_memory(start_addr: SnVirtAddr, end_addr: SnVirtAddr) {
         &mut memory_info.frame_allocator,
         start_addr_x86,
         end_addr_x86,
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE,
     )
     .expect("cannot map memory")
 }
@@ -372,6 +375,7 @@ fn map_user_memory_inner(
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
     start_addr: VirtAddr,
     end_addr: VirtAddr,
+    page_table_flags: PageTableFlags,
 ) -> Result<(), MapToError<Size4KiB>> {
     let page_range = {
         let heap_start = start_addr.clone();
@@ -385,13 +389,159 @@ fn map_user_memory_inner(
         let frame = frame_allocator
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
-        let flags =
-            PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
-        unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
+            
+        unsafe { mapper.map_to(page, frame, page_table_flags, frame_allocator)?.flush() };
     }
 
     Ok(())
 }
+
+/// Maps user accessible memory
+pub fn map_user_allocate_mem(start_addr: SnVirtAddr, end_addr: SnVirtAddr) {
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let physical_memory_offset = memory_info.physical_memory_offset;
+
+    let mut mapper: OffsetPageTable<'_> = unsafe { init_page_table(physical_memory_offset) };
+    let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
+    let end_addr_x86 = start_addr_x86 + 4095;
+    let start_ro_addr_x86 = start_addr_x86 + 4096;
+    let end_ro_addr_x86 = VirtAddr::new(end_addr.as_u64());
+
+    map_user_memory_inner(
+        &mut mapper,
+        &mut memory_info.frame_allocator,
+        start_addr_x86,
+        end_addr_x86,
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE,
+    )
+    .expect("cannot map memory");
+
+    map_user_memory_inner(
+        &mut mapper,
+        &mut memory_info.frame_allocator,
+        start_ro_addr_x86,
+        end_ro_addr_x86,
+        PageTableFlags::PRESENT | PageTableFlags::USER_ACCESSIBLE,
+    )
+    .expect("cannot map memory");
+}
+
+fn find_empty_stack_entry(level_4_table: *mut PageTable, idx_1: u64, idx_2: u64) -> *mut PageTable {
+    let memory_info = unsafe {MEMORY_INFO.as_mut().unwrap()};
+    let mut table = unsafe {&mut *level_4_table};
+    let thread_stack_page_index: [u64; 2] = [idx_1, idx_2];
+    for index in thread_stack_page_index {
+        let entry = &mut table[index as usize];
+        if entry.is_unused() {
+            let (new_table_ptr, new_table_physaddr) = create_empty_pagetable();
+            entry.set_addr(PhysAddr::new(new_table_physaddr),
+               PageTableFlags::PRESENT |
+               PageTableFlags::WRITABLE |
+               PageTableFlags::USER_ACCESSIBLE);
+        }
+        table = unsafe {&mut *(memory_info.physical_memory_offset
+                                + entry.addr().as_u64())
+                            .as_mut_ptr()};
+    }
+
+    table
+}
+
+/// Maps user accessible memory
+pub fn get_user_thread_stack(page_table_phys_addr: u64) -> Result<(u64, u64) , &'static str> {
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let physical_memory_offset = memory_info.physical_memory_offset;
+    let mut table = unsafe { get_page_table_from_address(physical_memory_offset, page_table_phys_addr) };
+    let mut thread_stack_index: [u64; 3] = [0, 0, 0];
+    'all: for idx_1 in 3..6 {
+        for idx_2 in 0..511 {
+            let page_table = unsafe {&mut *(find_empty_stack_entry(table, idx_1, idx_2)) };
+            for idx_3 in 0..512 {
+                if page_table[idx_3].is_unused() {
+                    table = unsafe {&mut *(page_table)};
+                    thread_stack_index[0] = idx_1;
+                    thread_stack_index[1] = idx_2;
+                    thread_stack_index[2] = idx_3 as u64;
+                    break 'all;
+                }
+            }
+        }
+    }
+    if thread_stack_index[0] == 0 {
+       return Err("All thread stack slots are full");
+    }
+    let slot_address: u64 =
+        ((thread_stack_index[0] as u64) << 39) +
+        ((thread_stack_index[1] as u64) << 30) +
+        ((thread_stack_index[2] as u64) << 21);
+
+    Ok((slot_address + 4096,slot_address + USER_STACK_SIZE))
+}
+
+/// Maps user accessible memory
+pub fn get_user_heap(page_table_phys_addr: u64) -> Result<(u64, u64) , &'static str> {
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let physical_memory_offset = memory_info.physical_memory_offset;
+    let mut table = unsafe { get_page_table_from_address(physical_memory_offset, page_table_phys_addr) };
+    let mut thread_stack_index: [u64; 3] = [0, 0, 0];
+    'all: for idx_1 in 7..11 {
+        for idx_2 in 0..511 {
+            let page_table = unsafe {&mut *(find_empty_stack_entry(table, idx_1, idx_2)) };
+            for idx_3 in 0..256 {
+                if page_table[idx_3 * 2 + 1].is_unused() {
+                    table = unsafe {&mut *(page_table)};
+                    thread_stack_index[0] = idx_1;
+                    thread_stack_index[1] = idx_2;
+                    thread_stack_index[2] = idx_3 as u64;
+                    break 'all;
+                }
+            }
+        }
+    }
+    if thread_stack_index[0] == 0 {
+       return Err("All thread heap slots are full");
+    }
+    let slot_address: u64 =
+        ((thread_stack_index[0] as u64) << 39) +
+        ((thread_stack_index[1] as u64) << 30) +
+        ((thread_stack_index[2] as u64) << 21);
+
+    Ok((slot_address + 4096,slot_address + USER_HEAP_SIZE))
+}
+
+/// Maps user accessible memory
+pub fn map_missing_user_page(start_addr: SnVirtAddr) -> Result<(), MapToError<Size4KiB>> {
+    let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
+    let physical_memory_offset = memory_info.physical_memory_offset;
+
+    let mut mapper: OffsetPageTable<'_> = unsafe { init_page_table(physical_memory_offset) };
+    let start_addr_x86 = VirtAddr::new(start_addr.as_u64());
+
+    map_missing_user_page_inner(
+        &mut mapper,
+        &mut memory_info.frame_allocator,
+        start_addr_x86,
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE,
+    )
+}
+
+/// Create heap
+fn map_missing_user_page_inner(
+    mapper: &mut impl Mapper<Size4KiB>,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+    start_addr: VirtAddr,
+    page_table_flags: PageTableFlags,
+) -> Result<(), MapToError<Size4KiB>> {
+    let page = Page::containing_address(start_addr);
+    let frame = frame_allocator
+        .allocate_frame()
+        .ok_or(MapToError::FrameAllocationFailed)?;
+    let _ = mapper.unmap(page);
+    unsafe { mapper.map_to(page, frame, page_table_flags, frame_allocator)?.flush() };
+
+    Ok(())
+}
+
 
 pub fn unmap_memory(start_addr: SnVirtAddr, end_addr: SnVirtAddr) {
     let memory_info = unsafe { MEMORY_INFO.as_mut().unwrap() };
